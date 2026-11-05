@@ -189,7 +189,11 @@ function guardar(id){
 async function actualizar(){
   if(cargando||!DBX.conectado()) return; cargando=true; errCarga=""; pintarEstado();
   try{
-    const t=await DBX.leerJSON("trabajos.json"), c=await DBX.leerJSON("clientes.json");
+    // La Gestión comercial deja cada envío con fecha (trabajos_AAAAMMDD-HHMMSS.json): se usa el más reciente
+    let ents=[]; try{ ents=await DBX.listarCarpeta(DBX.CARPETA); }catch(e){ if(e.code==="red"||e.code==="sin_sesion") throw e; }
+    const ultimo=pre=>{ const f=ents.filter(e=>e[".tag"]==="file"&&new RegExp("^"+pre+"(_[0-9-]+)?\\.json$","i").test(e.name)).sort((a,b)=>a.name===pre+".json"?-1:b.name===pre+".json"?1:a.name.localeCompare(b.name)); return f.length?f[f.length-1].name:null; };
+    const nt=ultimo("trabajos"), nc=ultimo("clientes");
+    const t=nt?await DBX.leerJSON(nt):null, c=nc?await DBX.leerJSON(nc):null;
     if(t){ trabajos=Array.isArray(t)?t:(t.trabajos||[]); ls.set("cache-trabajos",trabajos); }
     if(c){ clientes=Array.isArray(c)?c:(c.clientes||[]); ls.set("cache-clientes",clientes); }
     if(!t&&!c) errCarga="Todavía no hay trabajos.json ni clientes.json en Dropbox ("+DBX.CARPETA+").";
