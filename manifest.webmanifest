@@ -1,0 +1,19 @@
+{
+  "name": "Parte de campo · IngEcAmur",
+  "short_name": "Parte de campo",
+  "description": "Partes de campo, fotos, datos GPS y fichas de clientes de IngEcAmur, con subida a Dropbox.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef1ef",
+  "theme_color": "#1f3d36",
+  "lang": "es",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

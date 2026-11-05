@@ -1,0 +1,601 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Parte de campo</title>
+<meta name="theme-color" content="#1f3d36">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Parte de campo">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script src="dbx.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: una columna para la libreta del GPS; buscador y trabajos sin medir → ficha de la finca con botones grandes */
+:root{
+  --bg:#eef1ef; --card:#ffffff; --ink:#18231f; --muted:#5b6b64; --line:#d3dbd7;
+  --vis:#f26a1b; --vis-ink:#ffffff; --deep:#1f3d36; --deep-ink:#eef1ef; --ok:#1f8a4c; --warn:#c0392b; --chip:#e3ebe7;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"Barlow",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#101715; --card:#18221f; --ink:#e8efec; --muted:#9db0a8; --line:#2b3a35;
+  --vis:#ff7a2e; --vis-ink:#1a0d04; --deep:#9fd2c3; --deep-ink:#0f1a17; --ok:#4cc27e; --warn:#ff6b5b; --chip:#22302b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101715; --card:#18221f; --ink:#e8efec; --muted:#9db0a8; --line:#2b3a35;
+  --vis:#ff7a2e; --vis-ink:#1a0d04; --deep:#9fd2c3; --deep-ink:#0f1a17; --ok:#4cc27e; --warn:#ff6b5b; --chip:#22302b; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.4;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 32px}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.demo{font-size:13px;color:var(--muted);background:var(--chip);border-radius:8px;padding:8px 12px;margin-top:12px}
+header.top{display:flex;align-items:center;gap:12px;padding-top:4px}
+.avatar{width:52px;height:52px;border-radius:50%;background:var(--vis);color:var(--vis-ink);display:grid;place-items:center;font:700 26px var(--display);flex:none}
+h1{font:700 30px/1 var(--display);margin:0;letter-spacing:.01em}
+.sub{color:var(--muted);font-size:15px}
+.search{position:relative}
+.search input{width:100%;min-height:58px;font:500 18px var(--body);border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--ink);padding:10px 14px 10px 50px}
+.search svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted)}
+.lbl{font:700 16px var(--display);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:4px 0 -4px}
+.pill{font:600 13px var(--body);padding:3px 9px;border-radius:99px;background:var(--chip);color:var(--ink);white-space:nowrap}
+.pill.ok{background:var(--ok);color:#fff}
+.job{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:var(--card);border:2px solid var(--line);
+  border-radius:16px;padding:14px;cursor:pointer;color:var(--ink);font:inherit}
+.job:focus-visible,button:focus-visible,a:focus-visible,label.btn:focus-within,input:focus-visible,textarea:focus-visible{outline:3px solid var(--vis);outline-offset:2px}
+.job .ico{width:56px;height:56px;flex:none;border-radius:14px;background:var(--deep);color:var(--deep-ink);display:grid;place-items:center}
+.job.done{border-style:dashed} .job.done .ico{background:var(--ok);color:#fff}
+.job .t{font:700 22px/1.1 var(--display)} .job .m{color:var(--muted);font-size:15px}
+.job .go{margin-left:auto;font:700 28px var(--display);color:var(--muted)}
+.job>div{min-width:0;display:flex;flex-direction:column;gap:2px}
+.antiguos{display:flex;flex-direction:column}
+.antiguos summary{list-style:none;justify-content:flex-start;font-size:19px}
+.antiguos summary::-webkit-details-marker{display:none}
+.antiguos summary::after{content:"▾";margin-left:auto;font-size:22px;transition:transform .15s}
+.antiguos[open] summary::after{transform:rotate(180deg)}
+.antbody{display:flex;flex-direction:column;gap:10px;padding-top:10px}
+.antbody input{width:100%;min-height:54px;font:500 18px var(--body);border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--ink);padding:10px 14px}
+ul.conceptos li .imp{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+ul.conceptos li.total{background:none;border-top:2px solid var(--line);border-radius:0;font-weight:700}
+ul.conceptos li.total::before{visibility:hidden}
+.pill.cita{background:var(--deep);color:var(--deep-ink);font-size:14px}
+.pill.cita.hoy{background:var(--vis);color:var(--vis-ink)}
+.pill.sincita{background:none;border:1px dashed var(--muted);color:var(--muted)}
+.citabox b{font:700 26px var(--display);font-variant-numeric:tabular-nums}
+input[type=date],input[type=time]{width:100%;min-height:54px;font:500 18px var(--body);border-radius:12px;border:2px solid var(--line);background:var(--bg);color:var(--ink);padding:8px 10px}
+ul.conceptos li.total.sub{font-weight:500;border-top:0;padding-block:2px}
+.ficha{display:flex;flex-direction:column;gap:10px;border-top:2px solid var(--line);padding-top:12px}
+.ficha h4{margin:4px 0 0;font:700 17px var(--display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.ficha .txt{margin:0;white-space:pre-wrap;font-size:15px;overflow-wrap:anywhere}
+.ficha ul.docs{margin:0;padding-left:18px;font-size:15px;display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}
+.fincab{background:var(--chip);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px;overflow-wrap:anywhere}
+.cab{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.cab span{display:flex;flex-direction:column;font-size:13px;color:var(--muted)}
+.cab b{font:700 19px var(--display);color:var(--ink);font-variant-numeric:tabular-nums}
+.aviso{font-size:15px;color:var(--muted);text-align:center}
+.empty{background:var(--card);border:2px dashed var(--line);border-radius:16px;padding:18px;color:var(--muted);text-align:center}
+svg{width:28px;height:28px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.back{align-self:flex-start;background:none;border:0;color:var(--ink);font:600 17px var(--body);padding:12px 0 0;cursor:pointer;display:flex;gap:6px;align-items:center}
+.back svg{width:22px;height:22px}
+.hero{background:var(--deep);color:var(--deep-ink);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:4px}
+.hero h2{font:700 30px/1.05 var(--display);margin:0;text-wrap:balance}
+.hero .k{font-size:15px;opacity:.85}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;min-height:62px;border-radius:14px;border:2px solid var(--line);
+  background:var(--card);color:var(--ink);font:700 20px var(--display);letter-spacing:.02em;text-decoration:none;cursor:pointer;padding:8px 10px;text-align:center}
+.btn.vis{background:var(--vis);border-color:var(--vis);color:var(--vis-ink)}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.warn{border-color:var(--warn);color:var(--warn)}
+.btn.small{min-height:48px;font-size:17px}
+.btn[disabled]{opacity:.55;cursor:default}
+label.btn{position:relative}
+label.btn input{position:absolute;width:1px;height:1px;opacity:0}
+section.box{background:var(--card);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);min-width:0}
+section.box h3{font:700 19px var(--display);margin:0;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:16px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.tel{display:flex;gap:10px;align-items:center;background:var(--chip);border-radius:12px;padding:10px 12px}
+.tel b{font:700 24px var(--display);letter-spacing:.03em;user-select:all;font-variant-numeric:tabular-nums;flex:1;min-width:0}
+.tel button{min-height:44px;padding:0 14px;font-size:16px}
+ul.conceptos{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+ul.conceptos li{display:flex;gap:10px;align-items:baseline;padding:8px 10px;border-radius:10px;background:var(--chip);font-size:16px}
+ul.conceptos li::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--vis);flex:none;transform:translateY(-1px)}
+.check{display:flex;align-items:center;gap:14px;padding:10px;border-radius:12px;background:var(--chip);cursor:pointer;font-size:18px;font-weight:500}
+.check input{appearance:none;width:36px;height:36px;border-radius:10px;border:3px solid var(--muted);flex:none;display:grid;place-items:center;background:var(--card);cursor:pointer;margin:0}
+.check input:checked{background:var(--ok);border-color:var(--ok)}
+.check input:checked::after{content:"";width:10px;height:18px;border:solid #fff;border-width:0 4px 4px 0;transform:rotate(45deg) translate(-1px,-2px)}
+.check .ci{color:var(--ink);display:grid;opacity:.75}
+.fotos{display:flex;flex-direction:column;gap:10px}
+.foto{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center;background:var(--chip);border-radius:12px;padding:8px}
+.foto img{width:96px;height:96px;object-fit:cover;border-radius:10px;max-width:100%;background:var(--line)}
+.foto .fi{display:flex;flex-direction:column;gap:6px;min-width:0}
+.foto .fn{font:700 18px var(--display)}
+.foto audio{width:100%;max-width:100%;height:36px}
+.estado{font-size:14px;color:var(--muted)}
+.estado.bad{color:var(--warn)}
+.lista{font-size:15px;color:var(--muted);display:flex;flex-direction:column;gap:4px;overflow-wrap:anywhere}
+.csvok{display:flex;flex-direction:column;gap:8px;background:var(--chip);border-radius:12px;padding:10px 12px;font-size:16px}
+textarea{width:100%;min-height:80px;font:inherit;border-radius:12px;border:2px solid var(--line);background:var(--bg);color:var(--ink);padding:10px}
+.inc{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.inc button{min-height:56px;font-size:17px}
+.inc button[aria-pressed="true"]{background:var(--warn);color:#fff;border-color:var(--warn)}
+.donebar{position:sticky;bottom:0;padding-block:10px calc(10px + env(safe-area-inset-bottom,0px));background:linear-gradient(transparent,var(--bg) 30%);display:flex;flex-direction:column;gap:8px}
+.donebar .btn{width:100%;min-height:72px;font-size:24px}
+.progreso{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:15px;display:flex;flex-direction:column;gap:3px}
+.progreso .ok{color:var(--ok)} .progreso .bad{color:var(--warn)}
+.hechoinfo{text-align:center;font-weight:600;color:var(--ok)}
+.estadobar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-top:10px}
+.estadobar .pt{width:10px;height:10px;border-radius:50%;background:var(--ok);flex:none}
+.estadobar .pt.cola{background:var(--vis)} .estadobar .pt.off{background:var(--warn)}
+.estadobar .txt{flex:1;min-width:0}
+.estadobar button{min-height:40px;padding:0 12px;font:600 15px var(--body);border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:5px}
+.tabs button{min-height:52px;border:0;border-radius:10px;background:none;color:var(--muted);font:700 18px var(--display);letter-spacing:.03em;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--deep);color:var(--deep-ink)}
+.login{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;margin-top:20px}
+.login h2{font:700 28px/1.1 var(--display);margin:0}
+.login p{margin:0;color:var(--muted)}
+.login input{width:100%;min-height:54px;font:500 17px var(--body);border-radius:12px;border:2px solid var(--line);background:var(--bg);color:var(--ink);padding:10px 12px}
+.refs{display:flex;flex-wrap:wrap;gap:6px}
+.refs a{font:600 14px var(--body);font-variant-numeric:tabular-nums;padding:6px 10px;border-radius:8px;background:var(--chip);color:var(--ink);text-decoration:none;overflow-wrap:anywhere}
+.lind{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:14px}
+.lind dt{color:var(--muted)} .lind dd{margin:0}
+.hist{display:flex;flex-direction:column;gap:6px;font-size:15px}
+.hist div{background:var(--chip);border-radius:10px;padding:8px 10px}
+.hist small{color:var(--muted);display:block}
+@media (prefers-reduced-motion:no-preference){.job,.btn{transition:transform .08s}.job:active,.btn:active{transform:scale(.98)}}
+</style>
+
+<div class="wrap" id="app"><p class="demo">Cargando trabajos…</p></div>
+
+<script>
+(function(){
+const I={
+ casa:'<svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>',
+ finca:'<svg viewBox="0 0 24 24"><path d="M3 20l5-12 5 7 3-4 5 9z"/><circle cx="17" cy="6" r="2"/></svg>',
+ punto:'<svg viewBox="0 0 24 24"><path d="M12 21s-7-6.5-7-12a7 7 0 0114 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>',
+ camara:'<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+ lapiz:'<svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/></svg>',
+ gps:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="7"/></svg>',
+ mic:'<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>',
+ mapa:'<svg viewBox="0 0 24 24"><path d="M9 4l-6 2v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg>',
+ coche:'<svg viewBox="0 0 24 24"><path d="M5 16V11l2-5h10l2 5v5"/><path d="M3 16h18v3H3z"/><circle cx="7" cy="16" r="1"/><circle cx="17" cy="16" r="1"/></svg>',
+ ficha:'<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="9" r="2.5"/><path d="M8 16c1-2 7-2 8 0"/></svg>',
+ ok:'<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>',
+ atras:'<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>',
+ lupa:'<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>',
+ plano:'<svg viewBox="0 0 24 24"><path d="M4 18l5-9 4 5 3-3 4 7z"/><circle cx="9" cy="9" r="1.5"/><circle cx="16" cy="11" r="1.5"/></svg>'
+};
+const dbxWeb=p=>"https://www.dropbox.com/home"+encodeURI(String(p||"").normalize("NFC"));
+const app=document.getElementById("app");
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const hoyISO=()=>{const d=new Date(),p=x=>String(x).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())};
+const fechaLarga=new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});
+const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+
+let quien=ls.get("parte-quien",""), abiertoAnt=false, trabajos=ls.get("cache-trabajos",[]), clientes=ls.get("cache-clientes",[]), partes={}, cargado=!!trabajos.length, busqueda="", buscaCli="", pestana=ls.get("parte-pestana","medir");
+let actualizado=ls.get("cache-actualizado",""), cargando=false, errCarga="", pendientesN=0, errCola="";
+
+// ---------- Datos: lista de trabajos y fichas en Dropbox; cada parte se guarda en el móvil y se sube ----------
+function parte(id){ if(!partes[id]){ const l=ls.get("parte-local-"+id,null); if(l) partes[id]=l; }
+  return partes[id]=partes[id]||{checks:{},nota:"",inc:[],fotos:[],voces:[],csv:null,dxf:null,hecho:false,t:0}; }
+let colaGuardar={};
+function avisoErr(){}
+function guardar(id){
+  const p=parte(id); p.t=Date.now(); p.quien=quien||p.quien||""; ls.set("parte-local-"+id,p);
+  clearTimeout(colaGuardar[id]); colaGuardar[id]=setTimeout(()=>{ delete colaGuardar[id];
+    DBX.encolar(DBX.CARPETA+"/partes/"+id+".json",JSON.stringify(p,null,1),"overwrite"); },1500);
+}
+async function actualizar(){
+  if(cargando||!DBX.conectado()) return; cargando=true; errCarga=""; pintarEstado();
+  try{
+    const t=await DBX.leerJSON("trabajos.json"), c=await DBX.leerJSON("clientes.json");
+    if(t){ trabajos=Array.isArray(t)?t:(t.trabajos||[]); ls.set("cache-trabajos",trabajos); }
+    if(c){ clientes=Array.isArray(c)?c:(c.clientes||[]); ls.set("cache-clientes",clientes); }
+    if(!t&&!c) errCarga="Todavía no hay trabajos.json ni clientes.json en Dropbox ("+DBX.CARPETA+").";
+    // Partes hechos desde otros móviles: se toma el más reciente
+    try{ const ents=await DBX.listarCarpeta(DBX.CARPETA+"/partes"), mios=new Set(trabajos.map(j=>j.id+".json"));
+      for(const e of ents){ if(!mios.has(e.name)) continue; const id=e.name.replace(/\.json$/,""), loc=parte(id);
+        if(colaGuardar[id]) continue; const local=ls.get("parte-local-"+id,null);
+        if(local&&local.t&&new Date(e.server_modified).getTime()<local.t) continue;
+        const txt=await DBX.descargar(e.path_display); if(!txt) continue; const rem=JSON.parse(txt);
+        if(!local||!local.t||(rem.t||0)>local.t){ partes[id]=Object.assign(loc,rem); ls.set("parte-local-"+id,partes[id]); } } }catch(e){}
+    actualizado=new Date().toISOString(); ls.set("cache-actualizado",actualizado);
+  }catch(e){ errCarga=e.code==="red"?"Sin cobertura: se muestran los datos guardados en el móvil.":e.code==="sin_sesion"?"Hay que volver a entrar en Dropbox.":"No se ha podido leer Dropbox ("+(e.message||e.code)+")."; }
+  cargando=false; cargado=true; recogerVuelta(); if(!document.activeElement||!/TEXTAREA|INPUT/.test(document.activeElement.tagName)) pintar(); else pintarEstado();
+}
+function haceCuanto(iso){ if(!iso) return "nunca"; const m=Math.round((Date.now()-new Date(iso))/60000); return m<1?"ahora mismo":m<60?"hace "+m+" min":m<1440?"hace "+Math.round(m/60)+" h":new Date(iso).toLocaleDateString("es-ES",{day:"numeric",month:"short"}); }
+function estadoHTML(){
+  const off=navigator.onLine===false||!!errCarga, cola=pendientesN>0;
+  const t=cargando?"Actualizando…":errCarga?errCarga:cola?pendientesN+" archivo"+(pendientesN>1?"s":"")+" pendiente"+(pendientesN>1?"s":"")+" de subir"+(errCola?" · "+errCola:""):"Todo subido · datos de "+haceCuanto(actualizado);
+  return `<div class="estadobar" id="estadobar"><span class="pt ${off?"off":cola?"cola":""}"></span><span class="txt">${esc(t)}</span><button id="refrescar" type="button">Actualizar</button></div>`;
+}
+function pintarEstado(){ const b=document.getElementById("estadobar"); if(b){ b.outerHTML=estadoHTML(); const r=document.getElementById("refrescar"); if(r) r.onclick=()=>{ DBX.procesar(); actualizar(); }; } }
+function pantallaLogin(msg){
+  app.innerHTML=`<div class="login"><div class="avatar" style="width:64px;height:64px;font-size:30px">IC</div>
+    <h2>Parte de campo</h2>
+    ${DBX.configurada()?`<p>Entra con la cuenta de Dropbox de la consultora. Solo hay que hacerlo una vez en cada móvil.</p>
+    ${msg?`<p style="color:var(--warn)">${esc(msg)}</p>`:""}
+    <button class="btn vis" id="entrar">Entrar con Dropbox</button>
+    <details><summary class="btn small">Si no vuelve solo a la app (iPhone)</summary>
+      <div style="display:flex;flex-direction:column;gap:10px;padding-top:10px">
+      <p>1. Pulsa «Abrir Dropbox», da permiso y copia el código que te enseña.<br>2. Vuelve aquí y pégalo.</p>
+      <button class="btn small" id="abrircod">Abrir Dropbox</button>
+      <input id="codigo" placeholder="Pega aquí el código" autocomplete="off">
+      <button class="btn ok small" id="canjear">Entrar con el código</button></div></details>`
+    :`<p>Falta poner la «App key» de Dropbox en <b>dbx.js</b>. Claude lo hace al registrar la app de Dropbox.</p>`}</div>`;
+  const e=document.getElementById("entrar"); if(e) e.onclick=()=>DBX.login();
+  const a=document.getElementById("abrircod"); if(a) a.onclick=async()=>{ window.open(await DBX.urlLogin(false),"_blank"); };
+  const c=document.getElementById("canjear"); if(c) c.onclick=async()=>{ const v=document.getElementById("codigo").value; if(!v.trim()) return;
+    c.disabled=true; c.textContent="Comprobando…"; try{ await DBX.canjear(v); arrancarDatos(); }catch(x){ pantallaLogin("No ha funcionado: "+x.message); } };
+}
+function arrancarDatos(){ cargado=!!trabajos.length||!!clientes.length; pintar(); actualizar(); }
+// ---------- Lista: trabajos sin medir y buscador de antiguos ----------
+function lista(){
+  const esMedido=j=>parte(j.id).hecho||j.estado==="medido";
+  const cit=j=>parte(j.id).cita||j.cita||"9999";
+  const pend=trabajos.filter(j=>!esMedido(j)).sort((a,b)=>cit(a).localeCompare(cit(b))||(a.orden||99)-(b.orden||99));
+  const ant=trabajos.filter(esMedido).sort((a,b)=>String(parte(b.id).fecha||"").localeCompare(String(parte(a.id).fecha||"")));
+  const q=norm(busqueda), antF=q?ant.filter(j=>norm([j.cliente,j.lugar,j.tipo,j.contacto].join(" ")).includes(q)):ant;
+  app.innerHTML=`${estadoHTML()}
+  ${trabajos.some(j=>j.prueba||j.ejemplo)?'<p class="demo">En pruebas · lo que se sube va a la carpeta de pruebas, no a la del cliente.</p>':''}
+  <header class="top"><div class="avatar">${quien?esc(quien[0]):"?"}</div><div style="flex:1;min-width:0"><h1>Parte de campo</h1><div class="sub">${fechaLarga}${quien?" · mide "+esc(quien):""}</div></div>${quien?'<button class="btn small" id="cambiar" style="min-height:44px">Cambiar</button>':''}</header>
+  ${quien?'':`<section class="box"><h3>¿Quién mide hoy?</h3><div class="row" style="grid-template-columns:1fr 1fr 1fr">${["Jesús","Pepa","Alejandro"].map(n=>`<button class="btn quien" data-n="${n}">${n}</button>`).join("")}</div></section>`}
+  <div class="tabs" role="tablist">${[["medir","Por medir"],["medidos","Medidos"],["clientes","Clientes"]].map(t=>`<button role="tab" data-t="${t[0]}" aria-selected="${pestana===t[0]}">${t[1]}</button>`).join("")}</div>
+  ${pestana==="clientes"?listaClientes():pestana==="medidos"?`
+  <div class="antiguos" id="antiguos">
+    <div class="antbody" style="padding-top:0">
+      ${ant.length>2?`<input id="buscar" type="search" placeholder="Buscar por cliente o lugar" value="${esc(busqueda)}" aria-label="Buscar trabajos ya medidos">`:''}
+      ${antF.length?antF.map(tarjeta).join(""):`<div class="empty">${ant.length?"Ninguno coincide.":"Todavía no hay trabajos medidos."}</div>`}
+    </div>
+  </div>`:`
+  <div class="lbl">Por medir · ${pend.length}</div>
+  ${!cargado?'<div class="empty">Cargando trabajos…</div>':pend.length?pend.map(tarjeta).join(""):'<div class="empty">No tienes trabajos pendientes de medir. Jesús o Pepa los añaden desde la oficina.</div>'}`}`;
+  const rf=document.getElementById("refrescar"); if(rf) rf.onclick=()=>{ DBX.procesar(); actualizar(); };
+  app.querySelectorAll(".tabs button").forEach(x=>x.onclick=()=>{ pestana=x.dataset.t; ls.set("parte-pestana",pestana); lista(); });
+  const bc=document.getElementById("buscacli");
+  if(bc) bc.oninput=()=>{ buscaCli=bc.value; const pos=bc.selectionStart; lista(); const n=document.getElementById("buscacli"); if(n){ n.focus(); try{n.setSelectionRange(pos,pos)}catch(e){} } };
+  app.querySelectorAll(".cli").forEach(x=>x.onclick=()=>{ location.hash="c="+x.dataset.id; });
+  app.querySelectorAll(".quien").forEach(x=>x.onclick=()=>{ quien=x.dataset.n; ls.set("parte-quien",quien); lista(); });
+  const cb=document.getElementById("cambiar"); if(cb) cb.onclick=()=>{ quien=""; ls.del("parte-quien"); lista(); };
+  const b=document.getElementById("buscar");
+  if(b) b.oninput=()=>{ busqueda=b.value; const pos=b.selectionStart; lista(); const n=document.getElementById("buscar"); if(n){ n.focus(); try{n.setSelectionRange(pos,pos)}catch(e){} } };
+  app.querySelectorAll(".job:not(.cli)").forEach(x=>x.onclick=()=>{ location.hash=x.dataset.id; });
+}
+function tarjeta(j){
+  const p=parte(j.id), medido=p.hecho||j.estado==="medido"; j=Object.assign({},j,{cita:p.cita||j.cita});
+  return `<button class="job ${medido?'done':''}" data-id="${esc(j.id)}">
+    <span class="ico">${medido?I.ok:(I[j.icon]||I.finca)}</span>
+    <div>${j.cita?`<span><span class="pill cita ${citaHoy(j.cita)?"hoy":""}">${esc(citaTxt(j.cita))}</span></span>`:(medido?"":'<span><span class="pill sincita">Cita pendiente de confirmar</span></span>')}<div class="t">${esc(j.cliente)}</div><div class="m">${esc(j.tipo)}</div><div class="m">${esc(j.lugar)}</div>
+    ${medido?`<span><span class="pill ok">Medido${p.fecha?" el "+esc(p.fecha.split("-").reverse().join("/")):""}</span></span>`:''}</div>
+    <span class="go">›</span></button>`;
+}
+
+// ---------- Clientes: todas las fichas de la Gestión comercial ----------
+function listaClientes(){
+  const q=norm(buscaCli), vis=clientes.filter(c=>!q||norm([c.nombre,c.municipio,c.lugar,c.trabajo,(c.refs||[]).join(" "),(c.fincas||[]).map(f=>f.registral+" "+f.ref).join(" "),c.titulares,c.telefono].join(" ")).includes(q))
+    .sort((a,b)=>String(b.alta||"").localeCompare(String(a.alta||"")));
+  return `<input id="buscacli" type="search" class="buscacli" placeholder="Nombre, municipio, ref. catastral, finca…" value="${esc(buscaCli)}" aria-label="Buscar clientes"
+    style="width:100%;min-height:56px;font:500 18px var(--body);border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--ink);padding:10px 14px">
+  <div class="lbl">${vis.length} de ${clientes.length} clientes</div>
+  ${clientes.length?vis.slice(0,150).map(c=>`<button class="job cli" data-id="${esc(c.id)}"><span class="ico">${I[(c.fincas||[]).some(f=>f.construccion)?"casa":"finca"]}</span>
+    <div><div class="t">${esc(c.nombre)}</div><div class="m">${esc(c.trabajo||"")}</div><div class="m">${esc(c.municipio||c.lugar||"")}</div>
+    ${c.presupuesto&&c.presupuesto.estado?`<span><span class="pill">${esc(ESTP[c.presupuesto.estado]||c.presupuesto.estado)}</span></span>`:""}</div><span class="go">›</span></button>`).join("")
+    :'<div class="empty">Todavía no hay fichas de clientes. Pulsa «Actualizar» con cobertura.</div>'}`;
+}
+function fichaCliente(c){
+  const fila=(k,v)=>v?`<dt>${k}</dt><dd>${esc(v)}</dd>`:"", ll=(typeof c.lat==="number"&&typeof c.lon==="number")?c.lat+","+c.lon:"", q=encodeURIComponent(c.lugar||c.municipio||"");
+  const pr=c.presupuesto||{}, fecha=x=>x?String(x).slice(0,10).split("-").reverse().join("/"):"";
+  app.innerHTML=`${estadoHTML()}
+  <button class="back" id="back">${I.atras} Clientes</button>
+  <div class="hero"><span class="k">${esc(c.trabajo||"")}</span><h2>${esc(c.nombre)}</h2><span class="k">${esc(c.lugar||c.municipio||"")}</span></div>
+  ${ll||q?`<div class="row"><a class="btn vis" href="https://www.google.com/maps/search/?api=1&query=${ll||q}" target="_blank" rel="noopener">${I.mapa} Maps</a>
+    <a class="btn vis" href="${ll?"https://waze.com/ul?ll="+ll+"&navigate=yes":"https://waze.com/ul?q="+q+"&navigate=yes"}" target="_blank" rel="noopener">${I.coche} Waze</a></div>`:""}
+  <section class="box"><h3>Contacto</h3>
+    <dl class="kv">${fila("Cliente",c.nombre)}${fila("Contacto",c.contacto)}${fila("Correo",c.email)}${fila("Municipio",c.municipio)}${fila("Ubicación",c.ubicacionTxt)}
+      ${fila("Atendió",c.atendio)}${fila("Alta",fecha(c.alta))}${fila("Estado",c.estado)}</dl>
+    ${c.telefono?`<div class="tel"><b>${esc(c.telefono)}</b><a class="btn small vis" href="tel:${esc(String(c.telefono).replace(/[^+\d]/g,""))}">Llamar</a></div>`:""}
+    ${c.telMedicion&&c.telMedicion!==c.telefono?`<div class="tel"><b>${esc(c.telMedicion)}</b><span class="estado">${esc(c.contactoMedicion||"medición")}</span><a class="btn small" href="tel:${esc(String(c.telMedicion).replace(/[^+\d]/g,""))}">Llamar</a></div>`:""}
+  </section>
+  ${(c.refs||[]).length?`<section class="box"><h3>Referencias catastrales</h3><div class="refs">${c.refs.map(r=>`<a href="https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat=${encodeURIComponent(r)}" target="_blank" rel="noopener">${esc(r)}</a>`).join("")}</div><div class="estado">Pulsa una referencia para verla en la Sede del Catastro.</div></section>`:""}
+  ${(c.fincas||[]).length?`<section class="box"><h3>Fincas · cabidas</h3>${c.fincas.map(x=>`<div class="fincab">
+      <b>${esc(x.registral||x.ref||"Finca")}</b>${x.ref&&x.registral?`<div class="estado">${esc(x.ref)}</div>`:""}
+      <div class="cab"><span>Registral<b>${m2(x.cabidaReg)}</b></span><span>Catastral<b>${m2(x.cabidaCat)}</b></span><span>Real<b>${m2(x.cabidaReal)}</b></span></div>
+      ${x.consCat||x.supConstruida?`<div class="estado">Construido: ${x.consCat?"Catastro "+m2(x.consCat):""}${x.consCat&&x.supConstruida?" · ":""}${x.supConstruida?"Registro "+m2(x.supConstruida):""}</div>`:""}
+      ${x.linderos&&Object.values(x.linderos).some(Boolean)?`<dl class="lind">${["norte","sur","este","oeste"].map(k=>x.linderos[k]?`<dt>${k[0].toUpperCase()+k.slice(1)}</dt><dd>${esc(x.linderos[k])}</dd>`:"").join("")}</dl>`:""}
+      ${x.uso?`<div class="estado">${esc(x.uso)}</div>`:""}</div>`).join("")}</section>`:""}
+  ${c.titulares?`<section class="box"><h3>Titulares</h3><p class="txt" style="margin:0">${esc(c.titulares)}</p></section>`:""}
+  <section class="box"><h3>Presupuesto</h3>${presupuestoHTML({conceptos:pr.conceptos||[],dto:pr.dto,iva:pr.iva,estadoPres:pr.estado})}
+    ${pr.pago?`<div class="estado">Pago: ${esc(pr.pago)}</div>`:""}</section>
+  ${c.conclusion?`<section class="box"><h3>Análisis</h3><p class="txt" style="margin:0;white-space:pre-wrap;font-size:15px">${esc(c.conclusion)}</p></section>`:""}
+  ${c.notas?`<section class="box"><h3>Notas</h3><p class="txt" style="margin:0;white-space:pre-wrap;font-size:15px">${esc(c.notas)}</p></section>`:""}
+  ${c.otros?`<section class="box"><h3>Resumen de la documentación</h3><p class="txt" style="margin:0;white-space:pre-wrap;font-size:15px">${esc(c.otros)}</p></section>`:""}
+  ${(c.docs||[]).length?`<section class="box"><h3>Documentos (${c.docs.length})</h3><ul class="docs" style="margin:0;padding-left:18px;font-size:15px;display:flex;flex-direction:column;gap:4px">${c.docs.map(d=>`<li><b>${esc(d.nombre)}</b>${d.texto?` · <span class="estado">${esc(d.texto)}</span>`:""}</li>`).join("")}</ul>
+    ${c.carpeta?`<a class="btn small" href="${dbxWeb(c.carpeta)}" target="_blank" rel="noopener">Ver los documentos en Dropbox</a>`:""}</section>`
+    :c.carpeta?`<section class="box"><h3>Documentos</h3><a class="btn small" href="${dbxWeb(c.carpeta)}" target="_blank" rel="noopener">Abrir la carpeta en Dropbox</a></section>`:""}
+  ${c.carpeta?`<section class="box"><h3>Carpeta del encargo</h3><p class="txt" style="margin:0;font-size:15px;overflow-wrap:anywhere">${esc(c.carpeta)}</p></section>`:""}
+  ${(c.historial||[]).length?`<section class="box"><h3>Historial</h3><div class="hist">${c.historial.slice().reverse().map(h=>`<div><small>${esc(fecha(h.fecha))}${h.quien?" · "+esc(h.quien):""}${h.canal?" · "+esc(h.canal):""}</small>${esc(h.texto)}</div>`).join("")}</div></section>`:""}`;
+  document.getElementById("back").onclick=()=>{ location.hash=""; };
+  const rf=document.getElementById("refrescar"); if(rf) rf.onclick=()=>{ DBX.procesar(); actualizar(); };
+}
+
+// ---------- Ficha de un trabajo ----------
+function ficha(j0){
+  const p=parte(j0.id), j=Object.assign({},j0,{cita:p.cita||j0.cita}), q=encodeURIComponent(j.lugar||""), ll=(typeof j.lat==="number"&&typeof j.lon==="number")?j.lat+","+j.lon:"";
+  const incs=["No puedo entrar","Falta un vértice","El vecino se opone","Otro problema"];
+  app.innerHTML=`
+  ${estadoHTML()}
+  <button class="back" id="back">${I.atras} Mis trabajos</button>
+  <div class="hero"><span class="k">${esc(j.tipo)}</span><h2>${esc(j.cliente)}</h2><span class="k">${esc(j.lugar)}</span></div>
+  <div class="row">
+    <a class="btn vis" href="https://www.google.com/maps/search/?api=1&query=${ll||q}" target="_blank" rel="noopener">${I.mapa} Maps</a>
+    <a class="btn vis" href="${ll?"https://waze.com/ul?ll="+ll+"&navigate=yes":"https://waze.com/ul?q="+q+"&navigate=yes"}" target="_blank" rel="noopener">${I.coche} Waze</a>
+  </div>
+
+  <section class="box"><h3>Cita con el cliente</h3>
+    <div class="citabox"><b id="citatxt">${j.cita?esc(citaTxt(j.cita)):"Pendiente de confirmar"}</b></div>
+    <div class="row"><input type="date" id="cita-d" value="${esc((j.cita||"").slice(0,10))}" aria-label="Día de la cita"><input type="time" id="cita-h" value="${esc((j.cita||"").slice(11,16))}" aria-label="Hora de la cita"></div>
+    <button class="btn small" id="cita-g">Guardar cita</button><span class="estado" id="cita-m"></span>
+  </section>
+
+  <section class="box"><h3>Cliente y contacto</h3>
+    <dl class="kv"><dt>Cliente</dt><dd>${esc(j.clienteCompleto||j.cliente)}</dd>
+      ${j.finca?`<dt>Finca</dt><dd>${esc(j.finca)}</dd>`:''}
+      <dt>Contacto</dt><dd>${esc(j.contacto||"—")}</dd></dl>
+    ${j.telefono?`<div class="tel"><b id="telnum">${esc(j.telefono)}</b><a class="btn small vis" href="tel:${esc(String(j.telefono).replace(/[^+\d]/g,""))}">Llamar</a><button class="btn small" id="copiar">Copiar</button></div>`:'<div class="estado">Sin teléfono en la ficha.</div>'}
+    <button class="btn small" id="verficha" aria-expanded="false">${I.ficha} Ficha del cliente</button>
+    <div id="fichapanel" hidden>${fichaHTML(j)}</div>
+  </section>
+
+  <section class="box"><h3>Presupuesto</h3>
+    ${presupuestoHTML(j)}
+  </section>
+
+  <section class="box"><h3>Qué hacer en la finca</h3>
+    ${(j.tareas||[]).map((t,i)=>`<label class="check"><input type="checkbox" id="c-${esc(j.id)}-${i}" data-i="${i}" ${p.checks[i]?'checked':''}><span class="ci">${I[t[0]]||I.punto}</span>${esc(t[1])}</label>`).join("")}
+  </section>
+
+  <section class="box"><h3>Fotos</h3>
+    <label class="btn vis">${I.camara} Hacer foto<input type="file" id="f-fotos" accept="image/*" capture="environment"></label>
+    <div class="fotos" id="fotos"></div>
+  </section>
+
+  <section class="box"><h3>Notas de voz y escritas</h3>
+    <label class="btn">${I.mic} Grabar nota de voz<input type="file" id="f-voz" accept="audio/*" capture></label>
+    <div class="lista" id="voces"></div>
+    <textarea id="nota" placeholder="Nota escrita (opcional)">${esc(p.nota)}</textarea>
+  </section>
+
+  <section class="box"><h3>Datos de campo</h3>
+    <label class="btn vis">${I.gps} Subir datos de campo (CSV)<input type="file" id="f-csv" accept=".csv,.txt,text/csv,text/plain"></label>
+    <div id="csvinfo"></div>
+  </section>
+
+  <section class="box"><h3>Problemas</h3>
+    <div class="inc">${incs.map(x=>`<button class="btn warn" aria-pressed="${p.inc.includes(x)}" data-x="${x}">${x}</button>`).join("")}</div>
+  </section>
+
+  <div class="donebar" id="donebar"></div>`;
+
+  document.getElementById("back").onclick=()=>{ location.hash=""; };
+  const rf=document.getElementById("refrescar"); if(rf) rf.onclick=()=>{ DBX.procesar(); actualizar(); };
+  document.getElementById("cita-g").onclick=async()=>{
+    const d=document.getElementById("cita-d").value, h=document.getElementById("cita-h").value, m=document.getElementById("cita-m");
+    if(!d){ m.textContent="Elige el día."; m.className="estado bad"; return; }
+    const v=d+"T"+(h||"00:00"); j.cita=v; p.cita=v; guardar(j.id); document.getElementById("citatxt").textContent=citaTxt(v);
+    m.textContent="Cita guardada (se sube a Dropbox)."; m.className="estado";
+  };
+  const vf=document.getElementById("verficha"), fp=document.getElementById("fichapanel");
+  vf.onclick=()=>{ fp.hidden=!fp.hidden; vf.setAttribute("aria-expanded",!fp.hidden); vf.lastChild.textContent=fp.hidden?" Ficha del cliente":" Cerrar ficha"; };
+  const cp=document.getElementById("copiar");
+  if(cp) cp.onclick=()=>{ const t=j.telefono; const ok=()=>{cp.textContent="Copiado"}; if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok,()=>seleccionar()); else seleccionar();
+    function seleccionar(){ const r=document.createRange(); r.selectNodeContents(document.getElementById("telnum")); const s=getSelection(); s.removeAllRanges(); s.addRange(r); cp.textContent="Seleccionado"; } };
+  app.querySelectorAll(".check input").forEach(c=>c.onchange=()=>{ p.checks[c.dataset.i]=c.checked; guardar(j.id); });
+  document.getElementById("nota").oninput=e=>{ p.nota=e.target.value; guardar(j.id); };
+  app.querySelectorAll(".inc button").forEach(b=>b.onclick=()=>{ const x=b.dataset.x; p.inc=p.inc.includes(x)?p.inc.filter(y=>y!==x):[...p.inc,x]; guardar(j.id); b.setAttribute("aria-pressed",p.inc.includes(x)); pintarHecho(j); });
+  document.getElementById("f-fotos").onchange=e=>{ const f=e.target.files[0]; e.target.value=""; if(f) nuevaFoto(j,f); };
+  document.getElementById("f-voz").onchange=e=>{ const f=e.target.files[0]; e.target.value=""; if(f) nuevaVoz(j,f); };
+  document.getElementById("f-csv").onchange=e=>{ const f=e.target.files[0]; e.target.value=""; if(f) nuevoCSV(j,f); };
+  pintarFotos(j); pintarVoces(j); pintarCSV(j); pintarHecho(j);
+}
+
+const ESTP={nuevo:"Sin presupuesto",enviado:"Presupuesto enviado",aceptado:"Aceptado",curso:"En curso",entregado:"Entregado",cobrado:"Cobrado",rechazado:"Rechazado"};
+const m2=v=>v===""||v==null?"—":Number(String(v).replace(",",".")).toLocaleString("es-ES",{maximumFractionDigits:2})+" m²";
+function fichaHTML(j){
+  const f=j.ficha||{};
+  const fila=(k,v)=>v?`<dt>${k}</dt><dd>${esc(v)}</dd>`:"";
+  return `<div class="ficha">
+    <dl class="kv">${fila("Nombre",j.clienteCompleto)}${fila("Teléfono",j.telefono)}${fila("Correo",j.email)}${fila("Dirección",j.lugar)}${fila("Municipio",j.municipio)}
+      ${fila("Trabajo",j.tipo)}${fila("Estado",ESTP[j.estadoPres]||j.estadoPres)}${fila("Atendió",f.atendio)}${fila("Alta",f.alta&&f.alta.split("-").reverse().join("/"))}
+      ${f.refs&&f.refs.length?fila("Ref. catastral",f.refs.join(", ")):""}${fila("Titulares",f.titulares)}</dl>
+    ${(f.fincas||[]).length?`<h4>Fincas · cabidas</h4>${f.fincas.map(x=>`<div class="fincab">
+      <b>${esc(x.ref||"Finca")}</b>${x.registral?`<div class="estado">${esc(x.registral)}</div>`:""}
+      <div class="cab"><span>Registral<b>${m2(x.cabidaReg)}</b></span><span>Catastral<b>${m2(x.cabidaCat)}</b></span><span>Real<b>${m2(x.cabidaReal)}</b></span></div>
+      ${x.uso?`<div class="estado">${esc(x.uso)}</div>`:""}</div>`).join("")}`:""}
+    ${f.conclusion?`<h4>Análisis</h4><p class="txt">${esc(f.conclusion)}</p>`:""}
+    ${f.notas?`<h4>Notas</h4><p class="txt">${esc(f.notas)}</p>`:""}
+    ${(f.docs||[]).length?`<h4>Documentos (${f.docs.length})</h4><ul class="docs">${f.docs.map(d=>`<li>${esc(d)}</li>`).join("")}</ul>`:""}
+    ${f.carpetaReal?`<h4>Carpeta del encargo</h4><p class="txt">${esc(f.carpetaReal)}</p>`:""}
+    ${f.carpetaReal?`<a class="btn small" href="${dbxWeb(f.carpetaReal)}" target="_blank" rel="noopener">Abrir la carpeta en Dropbox</a>`:""}
+  </div>`;
+}
+function citaHoy(c){ return String(c).slice(0,10)===hoyISO(); }
+function citaTxt(c){ const d=new Date(c), man=new Date(); man.setDate(man.getDate()+1);
+  const dia=citaHoy(c)?"Hoy":String(c).slice(0,10)===(man.getFullYear()+"-"+String(man.getMonth()+1).padStart(2,"0")+"-"+String(man.getDate()).padStart(2,"0"))?"Mañana":d.toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"short"});
+  const h=String(c).slice(11,16); return dia+(h&&h!=="00:00"?" · "+h:""); }
+function eur(n){ return Number(n).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" €"; }
+function presupuestoHTML(j){
+  const cs=(j.conceptos||[]).map(c=>typeof c==="string"?{c}:Array.isArray(c)?{c:c[0],i:c[1]}:c);
+  if(!cs.length) return '<div class="estado">Este cliente aún no tiene presupuesto con conceptos en la Gestión comercial.</div>';
+  const ok=v=>v!==null&&v!==""&&isFinite(v);
+  const bruto=cs.filter(c=>ok(c.i)).reduce((a,c)=>a+Number(c.i),0), dp=Number(j.dto)||0, dto=bruto*dp/100, base=bruto-dto, iva=j.iva==="21"?base*.21:0;
+  return `${j.estadoPres?`<span><span class="pill">${esc(ESTP[j.estadoPres]||j.estadoPres)}</span></span>`:""}
+    <ul class="conceptos">${cs.map(c=>`<li><span>${esc(c.c)}</span>${ok(c.i)?`<span class="imp">${eur(c.i)}</span>`:''}</li>`).join("")}
+    ${dp?`<li class="total sub"><span>Descuento ${dp} %</span><span class="imp">−${eur(dto)}</span></li>`:""}
+    <li class="total sub"><span>Base</span><span class="imp">${eur(base)}</span></li>
+    ${iva?`<li class="total sub"><span>IVA 21 %</span><span class="imp">${eur(iva)}</span></li>`:""}
+    <li class="total"><span>Total</span><span class="imp">${eur(base+iva)}</span></li></ul>`;
+}
+// ---------- Fotos con su nota de voz y notas sueltas: se suben al momento ----------
+const locales={};
+const num=n=>String(n).padStart(2,"0");
+function visita(p){ return p.visita||(p.visita=hoyISO()); }
+async function alMovil(j,f,sub,nombre){ // guarda en el móvil y pone en cola para Dropbox
+  const p=parte(j.id), clave=j.id+"|"+nombre, ruta=rutaCampo(j)+"/"+sub+"/"+nombre;
+  locales[clave]=URL.createObjectURL(f);
+  try{ await DBX.blobs.put(clave,f); }catch(e){}
+  await DBX.encolar(ruta,f,"add",ruta); return {ruta};
+}
+async function nuevaFoto(j,f){
+  const p=parte(j.id); visita(p); const n=p.fotos.length+1, ext=(f.name.split(".").pop()||"jpg").toLowerCase();
+  const item={nombre:"foto_"+num(n)+"."+ext}; p.fotos.push(item);
+  Object.assign(item,await alMovil(j,f,"fotos",item.nombre)); guardar(j.id); pintarFotos(j);
+}
+async function vozDeFoto(j,i,f){
+  const p=parte(j.id), fo=p.fotos[i], ext=(f.name.split(".").pop()||"m4a").toLowerCase();
+  fo.voz={nombre:fo.nombre.replace(/\.[^.]+$/,"")+"_voz."+ext};
+  Object.assign(fo.voz,await alMovil(j,f,"fotos",fo.voz.nombre)); guardar(j.id); pintarFotos(j);
+}
+async function nuevaVoz(j,f){
+  const p=parte(j.id); visita(p); const ext=(f.name.split(".").pop()||"m4a").toLowerCase(), item={nombre:"nota_"+num(p.voces.length+1)+"."+ext};
+  p.voces.push(item); Object.assign(item,await alMovil(j,f,"notas_voz",item.nombre)); guardar(j.id); pintarVoces(j);
+}
+const src=(j,it)=>locales[j.id+"|"+it.nombre]||"";
+function cargarLocal(j,it,el){ if(src(j,it)) return; DBX.blobs.get(j.id+"|"+it.nombre).then(b=>{ if(b){ locales[j.id+"|"+it.nombre]=URL.createObjectURL(b); el.src=locales[j.id+"|"+it.nombre]; } }).catch(()=>{}); }
+function est(it){ return !it.ruta?'<span class="estado">Guardada</span>':DBX.subido(it.ruta)?'<span class="estado">Subida a Dropbox ✓</span>':'<span class="estado">En cola, se sube al haber cobertura</span>'; }
+function pintarFotos(j){
+  const box=document.getElementById("fotos"); if(!box) return; const p=parte(j.id);
+  box.innerHTML=p.fotos.length?p.fotos.map((f,i)=>`<div class="foto"><img data-i="${i}" src="${esc(src(j,f))}" alt="${esc(f.nombre)}"><div class="fi">
+    <span class="fn">${esc(f.nombre)}</span>${est(f)}
+    ${f.voz?`<audio controls data-v="${i}" src="${esc(src(j,f.voz))}"></audio>${est(f.voz)}`:`<label class="btn small">${I.mic} Voz de esta foto<input type="file" accept="audio/*" capture data-i="${i}"></label>`}
+  </div></div>`).join(""):'<div class="estado">Aún no hay fotos. Cada foto puede llevar su nota de voz.</div>';
+  box.querySelectorAll("img[data-i]").forEach(x=>cargarLocal(j,p.fotos[+x.dataset.i],x));
+  box.querySelectorAll("audio[data-v]").forEach(x=>cargarLocal(j,p.fotos[+x.dataset.v].voz,x));
+  box.querySelectorAll("input[data-i]").forEach(x=>x.onchange=e=>{ const f=e.target.files[0]; if(f) vozDeFoto(j,+x.dataset.i,f); });
+}
+function pintarVoces(j){
+  const box=document.getElementById("voces"); if(!box) return; const p=parte(j.id);
+  box.innerHTML=p.voces.map((v,i)=>`<div><b>${esc(v.nombre)}</b> · ${est(v)}<audio controls data-k="${i}" src="${esc(src(j,v))}" style="width:100%;height:36px"></audio></div>`).join("");
+  box.querySelectorAll("audio[data-k]").forEach(x=>cargarLocal(j,p.voces[+x.dataset.k],x));
+}
+
+// ---------- Datos de campo: CSV → puntos → DXF → Editor DXF ----------
+function leerCSV(txt){
+  const L=txt.split(/\r?\n/).filter(l=>l.trim()); if(!L.length) return [];
+  const sep=[";","\t",","].find(s=>L[0].split(s).length>=3)||",";
+  const pts=[];
+  L.forEach((l,k)=>{
+    const c=l.split(sep).map(x=>x.trim().replace(/^"|"$/g,""));
+    const nums=c.map(v=>{ const t=sep===","?v:v.replace(",","."); return /^-?\d+(\.\d+)?$/.test(t)?parseFloat(t):NaN; });
+    const ie=nums.findIndex(v=>v>100000&&v<900000), in_=nums.findIndex(v=>v>3500000&&v<5000000);
+    if(ie<0||in_<0) return;
+    const resto=c.filter((_,i)=>i!==ie&&i!==in_&&!(isFinite(nums[i])&&i>Math.max(ie,in_)&&!c[i].match(/[a-z]/i)));
+    const nombre=c[0]&&0!==ie&&0!==in_?c[0]:String(k+1);
+    const cod=c.slice(1).filter((v,i)=>!isFinite(nums[i+1])&&v).join(" ");
+    const iz=nums.findIndex((v,i)=>i>Math.max(ie,in_)&&isFinite(v)&&v>-500&&v<4000);
+    pts.push({n:nombre,x:nums[ie],y:nums[in_],z:iz>=0?nums[iz]:0,c:cod});
+  });
+  return pts;
+}
+function dxfDePuntos(pts){
+  const o=[], w=(c,v)=>{o.push(String(c));o.push(String(v));}, n=v=>String(Math.round(v*1000)/1000);
+  const asc=s=>String(s).replace(/[^\x20-\x7e]/g,ch=>"\\U+"+ch.charCodeAt(0).toString(16).toUpperCase().padStart(4,"0"));
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity; pts.forEach(p=>{x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y);});
+  w(0,"SECTION");w(2,"HEADER");w(9,"$ACADVER");w(1,"AC1009");w(9,"$EXTMIN");w(10,n(x0));w(20,n(y0));w(9,"$EXTMAX");w(10,n(x1));w(20,n(y1));w(0,"ENDSEC");
+  w(0,"SECTION");w(2,"TABLES");w(0,"TABLE");w(2,"LTYPE");w(70,1);w(0,"LTYPE");w(2,"CONTINUOUS");w(70,0);w(3,"Solid line");w(72,65);w(73,0);w(40,0);w(0,"ENDTAB");
+  w(0,"TABLE");w(2,"LAYER");w(70,2);[["PUNTOS_CAMPO",4],["TEXTOS_CAMPO",7]].forEach(l=>{w(0,"LAYER");w(2,l[0]);w(70,0);w(62,l[1]);w(6,"CONTINUOUS");});w(0,"ENDTAB");w(0,"ENDSEC");
+  w(0,"SECTION");w(2,"ENTITIES");
+  pts.forEach(p=>{ w(0,"POINT");w(8,"PUNTOS_CAMPO");w(10,n(p.x));w(20,n(p.y));w(30,n(p.z));
+    w(0,"TEXT");w(8,"TEXTOS_CAMPO");w(10,n(p.x+0.15));w(20,n(p.y+0.15));w(30,0);w(40,"0.3");w(1,asc((p.n+" "+(p.c||"")).trim())); });
+  w(0,"ENDSEC");w(0,"EOF"); return o.join("\r\n")+"\r\n";
+}
+function rutaCampo(j){ const p=parte(j.id); return (j.carpeta||"/AA 2026/AA CLAUDE/Pruebas parte de campo/"+j.cliente)+"/03 CAMPO/"+(p.visita||p.fecha||hoyISO()); }
+async function nuevoCSV(j,f){
+  const p=parte(j.id), txt=await f.text(), pts=leerCSV(txt);
+  if(!pts.length){ p.csv={nombre:f.name,error:"No he encontrado puntos con coordenadas UTM en este archivo."}; pintarCSV(j); return; }
+  visita(p); p.csv={nombre:f.name,puntos:pts.length}; ls.set("parte-csv-"+j.id,txt); pintarCSV(j);
+  p.csv.ruta=rutaCampo(j)+"/datos_campo_original.csv"; await DBX.encolar(p.csv.ruta,txt,"overwrite");
+  guardar(j.id); pintarCSV(j); pintarHecho(j);
+  abrirEditor(j,dxfDePuntos(pts),"datos_campo.dxf");
+}
+function abrirEditor(j,dxf,nombre){
+  const p=parte(j.id), v=(p.dxf&&p.dxf.version||0)+1;
+  ls.set("parte-editor",{job:j.id,cliente:j.cliente,dxf,nombre,ruta:rutaCampo(j),salida:"datos_campo_"+(quien||"campo").normalize("NFD").replace(/[\u0300-\u036f]/g,"")+"_V"+v+".dxf"});
+  location.href="editor.html";
+}
+function recogerVuelta(){
+  const v=ls.get("parte-editor-vuelta",null); if(!v||!v.job) return;
+  const p=parte(v.job); p.dxf={nombre:v.nombre,enDropbox:!!v.enDropbox,version:((p.dxf&&p.dxf.version)||0)+1};
+  ls.set("parte-dxf-"+v.job,v.dxf); ls.del("parte-editor-vuelta"); guardar(v.job);
+}
+function pintarCSV(j){
+  const box=document.getElementById("csvinfo"); if(!box) return; const p=parte(j.id);
+  if(!p.csv){ box.innerHTML='<div class="estado">Al subir el CSV se abre el Editor DXF con los puntos, por si quieres cambiar o añadir algo.</div>'; return; }
+  if(p.csv.error&&!p.csv.puntos){ box.innerHTML=`<div class="estado bad">${esc(p.csv.nombre)}: ${esc(p.csv.error)}</div>`; return; }
+  box.innerHTML=`<div class="csvok"><div><b>${esc(p.csv.nombre)}</b> · ${p.csv.puntos} puntos · ${est(p.csv)}</div>
+    ${p.dxf?`<div>${I.ok} Plano guardado: <b>${esc(p.dxf.nombre)}</b>${p.dxf.enDropbox?" (ya en Dropbox)":" (se sube al terminar)"}</div>`:''}
+    <button class="btn small" id="reabrir">${I.plano} ${p.dxf?"Volver a abrir en el Editor DXF":"Abrir en el Editor DXF"}</button></div>`;
+  document.getElementById("reabrir").onclick=()=>{
+    const d=ls.get("parte-dxf-"+j.id,null), t=ls.get("parte-csv-"+j.id,null);
+    if(d) abrirEditor(j,d,p.dxf.nombre); else if(t) abrirEditor(j,dxfDePuntos(leerCSV(t)),"datos_campo.dxf"); else alertaCSV();
+  };
+  function alertaCSV(){ box.insertAdjacentHTML("beforeend",'<div class="estado bad">El CSV se subió desde otro aparato: vuelve a elegirlo para abrirlo aquí.</div>'); }
+}
+
+// ---------- Hecho en campo: todo a 03 CAMPO / fecha ----------
+function pintarHecho(j){
+  const bar=document.getElementById("donebar"); if(!bar) return; const p=parte(j.id), medido=p.hecho||j.estado==="medido", ok=puedeCerrar(p);
+  bar.innerHTML=`${medido?`<div class="hechoinfo">Ya medido${p.fecha?" el "+esc(p.fecha.split("-").reverse().join("/")):""} · puedes volver a usar todo para una nueva visita</div>`:""}
+    ${p.subida?progresoHTML(p)+'<div class="aviso">Todo queda en el móvil y se sube solo a Dropbox en cuanto hay cobertura.</div>':""}
+    <button class="btn ok" id="hecho" ${ok?"":"disabled"}>${I.ok} ${medido?"Hecho en campo (nueva visita)":"Hecho en campo"}</button>
+    ${ok?"":'<div class="aviso">Para cerrar, sube el CSV de datos de campo o marca un problema.</div>'}`;
+  document.getElementById("hecho").onclick=()=>{ if(puedeCerrar(p)) terminar(j); };
+}
+function puedeCerrar(p){ return !!(p.csv&&p.csv.puntos)||p.inc.length>0; }
+function progresoHTML(p){ return p.subida&&p.subida.length?`<div class="progreso">${p.subida.map(s=>`<span class="${s.ok?'ok':'bad'}">${s.ok?'✓':'✗'} ${esc(s.t)}</span>`).join("")}</div>`:""; }
+function resumen(j,p,ruta){
+  const L=[];
+  L.push("PARTE DE CAMPO · INGECAMUR","Fecha: "+p.fecha.split("-").reverse().join("/"),"Mide: "+(quien||"sin indicar"),"",
+    "Cliente: "+(j.clienteCompleto||j.cliente),"Contacto: "+(j.contacto||"—")+(j.telefono?" · "+j.telefono:""),"Lugar: "+(j.lugar||""),"Trabajo: "+(j.tipo||""),"Carpeta: "+ruta,"");
+  if(j.conceptos&&j.conceptos.length){ L.push("PRESUPUESTO"); j.conceptos.forEach(c=>{ const o=typeof c==="string"?{c}:Array.isArray(c)?{c:c[0],i:c[1]}:c; L.push(" - "+o.c+(isFinite(o.i)&&o.i!==null&&o.i!==""?"  "+eur(o.i):"")); }); L.push(""); }
+  L.push("QUÉ SE HA HECHO"); (j.tareas||[]).forEach((t,i)=>L.push(" ["+(p.checks[i]?"X":" ")+"] "+t[1])); L.push("");
+  L.push("PROBLEMAS: "+(p.inc.length?p.inc.join(", "):"ninguno")); L.push("");
+  L.push("DATOS DE CAMPO: "+(p.csv&&p.csv.puntos?p.csv.nombre+" ("+p.csv.puntos+" puntos) → datos_campo_original.csv":"no se subió CSV"));
+  L.push("PLANO EDITADO: "+(p.dxf?p.dxf.nombre:"no se editó")); L.push("");
+  L.push("FOTOS ("+p.fotos.length+")"); p.fotos.forEach(f=>L.push(" - fotos/"+f.nombre+(f.voz?" + fotos/"+f.voz.nombre:"")));
+  L.push("NOTAS DE VOZ ("+p.voces.length+")"); p.voces.forEach(v=>L.push(" - notas_voz/"+v.nombre));
+  L.push("","NOTA ESCRITA",p.nota||"(sin nota)");
+  return L.join("\r\n")+"\r\n";
+}
+async function terminar(j){
+  const p=parte(j.id); p.fecha=visita(p); const ruta=rutaCampo(j); p.subida=[]; const btn=document.getElementById("hecho"); if(btn){btn.disabled=true;btn.textContent="Guardando…";}
+  const pon=(t,ok)=>{ p.subida.push({t,ok}); };
+  async function crear(nombre,contenido,desc){ await DBX.encolar(ruta+"/"+nombre,contenido,"overwrite"); pon(desc+" → "+nombre,true); }
+  if(p.csv&&p.csv.puntos) pon("Datos de campo → datos_campo_original.csv",true); else pon("Datos de campo: no se subió CSV",false);
+  const dxf=ls.get("parte-dxf-"+j.id,null);
+  if(p.dxf&&!p.dxf.enDropbox&&dxf) await crear(p.dxf.nombre,dxf,"Plano editado"); else if(p.dxf) pon("Plano editado → "+p.dxf.nombre,true);
+  if(p.nota) await crear("notas.txt",p.nota+"\r\n","Nota escrita");
+  await crear("resumen_parte.txt",resumen(j,p,ruta),"Resumen del parte");
+  const media=p.fotos.length+p.fotos.filter(f=>f.voz).length+p.voces.length;
+  if(media) pon(media+" fotos y notas de voz → fotos/ y notas_voz/",true);
+  p.hecho=true; p.visita=null; guardar(j.id); pintarHecho(j); DBX.procesar(); window.scrollTo(0,document.body.scrollHeight);
+}
+// ---------- Navegación ----------
+function pintar(){ const h=decodeURIComponent(location.hash.slice(1));
+  if(h.startsWith("c=")){ const c=clientes.find(x=>x.id===h.slice(2)); if(c){ app.dataset.job=""; fichaCliente(c); window.scrollTo(0,0); return; } }
+  const j=trabajos.find(x=>x.id===h); if(j){ if(!document.getElementById("f-fotos")||app.dataset.job!==j.id){ app.dataset.job=j.id; ficha(j); window.scrollTo(0,0);} else { pintarFotos(j);pintarVoces(j);pintarCSV(j);pintarHecho(j);} } else { app.dataset.job=""; lista(); } }
+addEventListener("hashchange",pintar);
+addEventListener("pageshow",e=>{ if(!DBX.conectado()||!DBX.configurada()) return; recogerVuelta(); app.dataset.job=""; pintar(); });
+addEventListener("online",()=>{ pintarEstado(); actualizar(); }); addEventListener("offline",pintarEstado);
+DBX.alCambiar((n,err)=>{ const antes=pendientesN; pendientesN=n; errCola=err||""; pintarEstado();
+  if(antes>n){ const h=decodeURIComponent(location.hash.slice(1)), j=trabajos.find(x=>x.id===h); if(j&&document.getElementById("fotos")){ pintarFotos(j); pintarVoces(j); pintarCSV(j); } } });
+(async function(){
+  const v=await DBX.volverDeLogin();
+  if(!DBX.configurada()||!DBX.conectado()){ pantallaLogin(v&&v.error?"No se ha podido entrar: "+v.error:""); return; }
+  recogerVuelta(); arrancarDatos(); setInterval(()=>{ if(!document.hidden) actualizar(); },10*60000);
+})();
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+})();
+</script>
+
+</body></html>

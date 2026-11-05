@@ -1,0 +1,1051 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Editor DXF</title>
+<meta name="theme-color" content="#1f3d36">
+<link rel="manifest" href="manifest.webmanifest">
+<script src="dbx.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Mesa de dibujo: barra de herramientas arriba, lienzo grande y panel lateral de capas y mediciones (debajo en móvil) */
+:root{
+  --bg:#eef1f0; --paper:#ffffff; --ink:#18221f; --muted:#5d6b66; --line:#d5ddd9;
+  --accent:#1b6b5c; --accent-soft:#e2efeb; --sel:#e8590c; --canvas:#1c2421; --bad:#9b2c1f; --bad-soft:#f8e2de;
+  --f-body:"Archivo","Segoe UI",system-ui,sans-serif; --f-mono:"JetBrains Mono",Consolas,"Courier New",monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111816; --paper:#18211e; --ink:#e4ece9; --muted:#92a39d; --line:#2b3834;
+  --accent:#6cc2ae; --accent-soft:#1d3530; --sel:#ff8a3d; --canvas:#0d1311; --bad:#f09a8c; --bad-soft:#3c221e; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111816; --paper:#18211e; --ink:#e4ece9; --muted:#92a39d; --line:#2b3834;
+  --accent:#6cc2ae; --accent-soft:#1d3530; --sel:#ff8a3d; --canvas:#0d1311; --bad:#f09a8c; --bad-soft:#3c221e; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+.wrap{max-width:1400px;margin:0 auto;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:12px}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between}
+h1{font-size:22px;font-weight:700;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:0;font-size:13px}
+.bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:8px}
+.sep{width:1px;align-self:stretch;background:var(--line);margin:0 4px}
+button,label.btn{font:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:4px;padding:6px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+button:hover,label.btn:hover{border-color:var(--accent)}
+button.on{background:var(--accent-soft);border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,label.btn:focus-within,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+label.btn input{position:absolute;width:1px;height:1px;opacity:0}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px}
+@media (max-width:860px){.main{grid-template-columns:1fr}}
+.stage{position:relative;background:var(--canvas);border-radius:6px;overflow:hidden;height:min(72vh,780px);min-height:360px;touch-action:none}
+canvas{display:block;width:100%;height:100%;cursor:grab}
+canvas.edit{cursor:crosshair}
+.hud{position:absolute;left:8px;bottom:8px;font-family:var(--f-mono);font-size:11.5px;color:#e4ece9;background:rgba(0,0,0,.55);padding:3px 8px;border-radius:3px;pointer-events:none;font-variant-numeric:tabular-nums}
+.empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#cfd8d4;text-align:center;padding:24px}
+.empty b{font-size:16px;color:#fff}
+.empty[hidden],.msg[hidden],.row[hidden]{display:none}
+.empty.over{background:rgba(108,194,174,.15);outline:2px dashed #6cc2ae;outline-offset:-10px}
+.side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.panel h2{font-size:12px;font-family:var(--f-mono);font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+.layers{display:flex;flex-direction:column;gap:2px;max-height:260px;overflow:auto}
+.layer{display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 4px;border-radius:3px}
+.layer:hover{background:var(--accent-soft)}
+.layer input{margin:0}
+.sw{width:12px;height:12px;border-radius:2px;flex:none;border:1px solid rgba(0,0,0,.25)}
+.layer .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.layer .c{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+select,input[type=text],input[type=number]{font:inherit;font-size:13px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;width:100%}
+.tbl-wrap{overflow:auto;max-height:260px}
+table{border-collapse:collapse;width:100%;font-size:12.5px;font-variant-numeric:tabular-nums}
+th,td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+tr.pick{cursor:pointer} tr.pick:hover td{background:var(--accent-soft)}
+tfoot td{font-weight:600}
+.msg{font-size:13px;padding:8px 10px;border-radius:4px;background:var(--accent-soft)}
+.msg.err{background:var(--bad-soft)}
+.meta{font-size:12.5px;color:var(--muted)}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.grid3 label{display:flex;flex-direction:column;gap:2px;font-size:11.5px;color:var(--muted)}
+input[type=range]{width:100%}
+dialog{border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);padding:16px;width:min(560px,calc(100vw - 32px));max-height:80vh}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.clientes{display:flex;flex-direction:column;gap:2px;max-height:46vh;overflow:auto;margin-top:8px}
+.cli{display:flex;justify-content:space-between;gap:8px;padding:7px 8px;border-radius:4px;border:1px solid transparent;cursor:pointer;text-align:left;background:none;font-size:13.5px;width:100%}
+.cli:hover,.cli:focus-visible{border-color:var(--accent);background:var(--accent-soft)}
+.cli .g{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.pedir-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:2px 8px;font-size:12.5px}
+.pedir-lista label{display:flex;gap:5px;align-items:center}
+.kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border-radius:3px;padding:0 4px}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Editor DXF</h1>
+      <p class="sub">Abre un plano DXF, ponle la ortofoto debajo, muévete con el ratón, quita o mueve puntos y mide por capas.</p>
+    </div>
+    <span class="meta" id="nombre">Sin plano</span>
+  </header>
+
+  <div class="bar" role="toolbar" aria-label="Herramientas">
+    <label class="btn" title="Abrir un plano DXF">Abrir DXF<input type="file" id="f-dxf" accept=".dxf"></label>
+    <label class="btn" title="Añadir GML de Catastro, de validación gráfica o de construcciones como capas encima del plano">GML<input type="file" id="f-gml" accept=".gml,.xml" multiple></label>
+    <label class="btn" title="Ortofotos de varios años y la capa de Catastro, con sus archivos de georreferencia (.jgw, .pgw)">Ortofotos<input type="file" id="f-img" accept="image/*,.jgw,.pgw,.tfw,.wld" multiple></label>
+    <span class="sep"></span>
+    <button type="button" id="m-pan" class="on" aria-pressed="true" title="Arrastra para moverte (tecla V)">Mover vista</button>
+    <button type="button" id="m-edit" aria-pressed="false" title="Pincha un punto o vértice para elegirlo y arrástralo para moverlo (tecla E)">Editar puntos</button>
+    <button type="button" id="m-box" aria-pressed="false" title="Arrastra un recuadro para elegir varios puntos (tecla R)">Elegir con recuadro</button>
+    <button type="button" id="m-une" aria-pressed="false" title="Dibuja una polilínea pinchando puntos del plano o en vacío; al cerrar te da la superficie (tecla U)">Unir puntos</button>
+    <span class="sep"></span>
+    <button type="button" id="b-del" disabled title="Quitar los puntos elegidos (Supr)">Quitar puntos</button>
+    <button type="button" id="b-expl" disabled title="Borra la línea o polilínea elegida y deja sus vértices como puntos sueltos (tecla X)">Quitar línea, dejar puntos</button>
+    <button type="button" id="b-undo" disabled title="Deshacer (Ctrl+Z)">Deshacer</button>
+    <button type="button" id="b-fit" title="Ver todo el plano (tecla F)">Ver todo</button>
+    <span class="sep"></span>
+    <button type="button" class="primary" id="b-save" disabled>Guardar archivo</button>
+  </div>
+
+  <div class="main">
+    <div class="stage" id="stage">
+      <canvas id="cv" aria-label="Plano"></canvas>
+      <div class="empty" id="empty">
+        <b>Arrastra aquí un DXF</b>
+        <span>o pulsa «Abrir DXF». Después añade los GML de Catastro como capas y la ortofoto: el JPG con su archivo .jgw.</span>
+        <button type="button" id="b-ej">Ver un ejemplo</button>
+      </div>
+      <div class="hud" id="hud">—</div>
+    </div>
+
+    <div class="side">
+      <section class="panel" aria-labelledby="h-sel">
+        <h2 id="h-sel">Selección</h2>
+        <div class="meta" id="sel-info">Nada elegido. En «Editar puntos», pincha un punto o un vértice.</div>
+        <div id="sel-ctl" hidden style="display:flex;flex-direction:column;gap:8px">
+          <div id="sel-xy">
+            <div class="grid3" style="grid-template-columns:1fr 1fr auto;align-items:end">
+              <label>X<input type="number" id="s-x" step="0.001"></label>
+              <label>Y<input type="number" id="s-y" step="0.001"></label>
+              <button type="button" id="s-mover">Mover aquí</button>
+            </div>
+          </div>
+          <div class="grid3" style="grid-template-columns:1fr 1fr auto;align-items:end">
+            <label>Desplazar X (m)<input type="number" id="s-dx" step="0.01" value="0"></label>
+            <label>Desplazar Y (m)<input type="number" id="s-dy" step="0.01" value="0"></label>
+            <button type="button" id="s-desp">Desplazar</button>
+          </div>
+          <label class="meta" for="s-capa">Pasar a la capa</label>
+          <div class="grid3" style="grid-template-columns:1fr auto;align-items:end">
+            <select id="s-capa" aria-label="Capa de destino"></select>
+            <button type="button" id="s-cambiar">Cambiar capa</button>
+          </div>
+          <input type="text" id="s-nueva" placeholder="Nombre de la capa nueva" aria-label="Nombre de la capa nueva" hidden>
+          <span class="meta" id="s-nota"></span>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-une" id="p-une" hidden>
+        <h2 id="h-une">Unir puntos</h2>
+        <div class="meta" id="une-info">Pincha en el orden de la polilínea: sobre un punto del plano se engancha a él; en vacío pone un punto nuevo. Pinchando otra vez el primero se cierra. Arrastrando mueves la vista.</div>
+        <label class="meta" for="une-capa">Capa de la polilínea</label>
+        <select id="une-capa" aria-label="Capa de la polilínea nueva"></select>
+        <input type="text" id="une-nueva" placeholder="Nombre de la capa nueva" aria-label="Nombre de la capa nueva" hidden>
+        <div class="row">
+          <button type="button" class="primary" id="une-cerrar" title="Cerrar el recinto y medirlo (Intro)">Cerrar recinto</button>
+          <button type="button" id="une-abierta" title="Crear una línea abierta, sin cerrar">Dejar abierta</button>
+        </div>
+        <div class="row">
+          <button type="button" id="une-atras" title="Quitar el último punto marcado (Retroceso)">Quitar último</button>
+          <button type="button" id="une-cancelar" title="Empezar de nuevo (Esc)">Empezar de nuevo</button>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-cap">
+        <h2 id="h-cap">Capas</h2>
+        <div class="row"><button type="button" id="cap-todas">Todas</button><button type="button" id="cap-ninguna">Ninguna</button></div>
+        <div class="layers" id="layers"><span class="meta">Abre un plano para ver sus capas.</span></div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-med">
+        <h2 id="h-med">Medir capa</h2>
+        <select id="med-capa" aria-label="Capa a medir"><option value="">Elige una capa…</option></select>
+        <div class="tbl-wrap" id="med-res"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-orto">
+        <h2 id="h-orto">Ortofotos y Catastro</h2>
+        <div class="layers" id="fotos"><span class="meta">Sin ortofotos. Súbelas con sus .jgw (puedes elegir varias a la vez).</span></div>
+        <div class="row" id="o-pasos" hidden><button type="button" id="o-ant" title="Año anterior (tecla ,)">◀ Año anterior</button><button type="button" id="o-sig" title="Año siguiente (tecla .)">Año siguiente ▶</button></div>
+        <div class="grid3">
+          <label>X esquina sup. izq.<input type="number" id="o-x" step="0.01"></label>
+          <label>Y esquina sup. izq.<input type="number" id="o-y" step="0.01"></label>
+          <label>Metros por píxel<input type="number" id="o-p" step="0.001" value="0.1"></label>
+        </div>
+        <div class="row"><button type="button" id="o-aplicar">Colocar la elegida</button><button type="button" id="o-quitar">Quitar todas</button></div>
+        <details id="pedir">
+          <summary style="cursor:pointer;font-weight:600;font-size:13px">Elegir años y Catastro para pedírselos a Claude</summary>
+          <p class="meta" style="margin:6px 0">Esta página no puede descargar mapas del IGN ni de Catastro. Marca lo que quieras, copia la petición y pégala en el chat con Claude: te los descarga para la zona de tu plano y te los enseña antes de guardar.</p>
+          <div class="pedir-lista" id="pedir-lista"></div>
+          <div class="row" style="margin-top:6px"><button type="button" id="pedir-todos">Todos</button><button type="button" id="pedir-ninguno">Ninguno</button><button type="button" class="primary" id="pedir-copiar">Copiar petición</button></div>
+          <textarea id="pedir-texto" readonly rows="4" aria-label="Petición para Claude" style="width:100%;margin-top:6px;font:inherit;font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:6px"></textarea>
+        </details>
+        <label class="meta" for="o-op">Transparencia del plano sobre la foto</label>
+        <input type="range" id="o-op" min="0.2" max="1" step="0.05" value="1">
+      </section>
+
+      <div class="msg" id="msg" hidden></div>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <form method="dialog" id="dlg-form">
+    <h2 style="margin:0 0 4px;font-size:17px">Guardar archivo</h2>
+    <p class="meta" style="margin:0 0 10px">Se guarda como DXF R12 (abre en ZWCAD y en cualquier programa) con el dibujo y sus capas. Tu archivo original no se toca. Las presentaciones con cajetín, los rayados y las ortofotos enlazadas no van en esta copia: pásasela a Claude y la vuelve a montar con todo.</p>
+    <label class="meta" for="g-nombre">Nombre</label>
+    <input type="text" id="g-nombre">
+    <div class="row" style="margin-top:12px">
+      <button type="button" class="primary" id="g-desc">Descargas</button>
+      <button type="button" id="g-cli">Carpeta del cliente</button>
+      <button type="button" id="g-cancel" value="cancel">Cancelar</button>
+    </div>
+    <div id="g-clientes" hidden>
+      <input type="text" id="g-filtro" placeholder="Busca el cliente…" aria-label="Buscar cliente" style="margin-top:12px">
+      <div class="clientes" id="g-lista"></div>
+    </div>
+    <div class="msg" id="g-msg" hidden style="margin-top:10px"></div>
+  </form>
+</dialog>
+
+<script>
+(function(){
+  var $=function(i){return document.getElementById(i)};
+  function el(t,c,x){var e=document.createElement(t); if(c) e.className=c; if(x!=null) e.textContent=x; return e;}
+  var cv=$("cv"), ctx=cv.getContext("2d"), stage=$("stage");
+
+  // ---------- Modelo: entidades simples con sus vértices en coordenadas reales ----------
+  // {t:"POINT"|"LINE"|"PLINE"|"CIRCLE"|"ARC"|"TEXT", l:capa, p:[[x,y],…], c:cerrada, r, a0, a1, s:texto, h:altura, rot}
+  var ents=[], capas={}, nombre="", ocultas={}, saltadas=0;
+  var vista={s:1,cx:0,cy:0}, modo="pan", sel=[], hist=[], fotos=[], fondo=null, opPlano=1;
+  var ACI=["#000000","#ff0000","#ffff00","#00ff00","#00ffff","#0000ff","#ff00ff","#ffffff","#808080","#c0c0c0"];
+  function colorACI(n){ n=Math.abs(n|0); if(n>=1&&n<=9) return ACI[n]; if(n>=250) return "#"+((n-250)*40+40).toString(16).padStart(2,"0").repeat(3);
+    var h=((n-10)/240*360)%360, sat=(n%2)?55:90, li=[50,42,60,35,70][Math.floor((n%10)/2)]; return "hsl("+h+","+sat+"%,"+li+"%)"; }
+  function colorCapa(l){ var c=capas[l]&&capas[l].color; return c==null?"#e4ece9":(Math.abs(c)===7?"#e4ece9":colorACI(c)); }
+
+  // ---------- Lectura del DXF (R12 a 2018): pares código/valor ----------
+  function decodificar(buf){
+    var latin=new TextDecoder("windows-1252").decode(buf), m=/\$ACADVER\s*\r?\n\s*1\s*\r?\n\s*AC(\d+)/.exec(latin);
+    return (m&&parseInt(m[1],10)>=1021)?new TextDecoder("utf-8").decode(buf):latin;
+  }
+  function deUnicode(s){ return String(s).replace(/\\U\+([0-9A-Fa-f]{4})/g,function(_,h){return String.fromCharCode(parseInt(h,16))}).replace(/%%[cC]/g,"Ø").replace(/%%[dD]/g,"°").replace(/%%[pP]/g,"±").replace(/\\P/g," ").replace(/\{\\[^;]*;|\}/g,""); }
+  function leerDXF(txt){
+    var L=txt.split(/\r?\n/), P=[]; for(var i=0;i+1<L.length;i+=2) P.push([parseInt(L[i],10),L[i+1].replace(/^\s+|\s+$/g,"")]);
+    var out=[], cap={}, sec="", i=0, skip=0, bloques={}, blq=null, nImg=0, nBlq=0, imgs=[], defs={}, papel=0;
+    function num(v){ return parseFloat(v); }
+    // Lee la entidad que empieza en P[i] (código 0) y deja i en la siguiente
+    function leerEnt(){
+      var tipo=P[i][1], g={l:"0",x:[],y:[],v:{},t300:[]}; i++;
+      while(i<P.length&&P[i][0]!==0){ var k=P[i][0], val=P[i][1];
+        if(k===8) g.l=val; else if(k===10) g.x.push(num(val)); else if(k===20) g.y.push(num(val)); else if(k===300) g.t300.push(val); else if(!(k in g.v)) g.v[k]=val;
+        i++; }
+      // Elementos de las presentaciones (cajetín, ventanas): no son del dibujo en coordenadas, no se cargan
+      if(sec==="ENTITIES"&&g.v[67]==="1"){ papel++; return null; }
+      if(tipo==="VIEWPORT") return null;
+      var e=null;
+      if(tipo==="POINT") e={t:"POINT",p:[[g.x[0],g.y[0]]]};
+      else if(tipo==="LINE") e={t:"LINE",p:[[g.x[0],g.y[0]],[num(g.v[11]),num(g.v[21])]]};
+      else if(tipo==="LWPOLYLINE"){ e={t:"PLINE",p:g.x.map(function(x,j){return [x,g.y[j]]}),c:(parseInt(g.v[70]||0,10)&1)===1}; }
+      else if(tipo==="POLYLINE"){
+        e={t:"PLINE",p:[],c:(parseInt(g.v[70]||0,10)&1)===1};
+        while(i<P.length&&P[i][0]===0&&P[i][1]==="VERTEX"){ i++; var vx=0,vy=0; while(i<P.length&&P[i][0]!==0){ if(P[i][0]===10) vx=num(P[i][1]); if(P[i][0]===20) vy=num(P[i][1]); i++; } e.p.push([vx,vy]); }
+        if(i<P.length&&P[i][1]==="SEQEND"){ i++; while(i<P.length&&P[i][0]!==0) i++; }
+      }
+      else if(tipo==="CIRCLE") e={t:"CIRCLE",p:[[g.x[0],g.y[0]]],r:num(g.v[40])};
+      else if(tipo==="ARC") e={t:"ARC",p:[[g.x[0],g.y[0]]],r:num(g.v[40]),a0:num(g.v[50]),a1:num(g.v[51])};
+      else if(tipo==="TEXT"||tipo==="MTEXT"||tipo==="ATTRIB"){
+        if(tipo==="ATTRIB"&&(parseInt(g.v[70]||0,10)&1)) return null; // atributo invisible
+        var al=(parseInt(g.v[72]||0,10)||parseInt(g.v[73]||0,10))&&tipo!=="MTEXT"&&g.v[11]!=null;
+        e={t:"TEXT",p:[al?[num(g.v[11]),num(g.v[21])]:[g.x[0],g.y[0]]],s:deUnicode(g.v[1]||""),h:num(g.v[40])||1,rot:num(g.v[50])||0,al:al?parseInt(g.v[72]||0,10):0};
+      }
+      // Bloque insertado: se descompone al final, cuando ya se han leído todos los bloques
+      else if(tipo==="INSERT") e={t:"INSERT",n:g.v[2],p:[[g.x[0],g.y[0]]],sx:num(g.v[41])||1,sy:num(g.v[42])||1,rot:num(g.v[50])||0};
+      // Puntos de programas de topografía (MDT de Aplitop «PUNTO MDT V5»…): punto con su número y código
+      else if(/PUNTO|POINT/i.test(tipo)&&g.x.length) e={t:"POINT",p:[[g.x[0],g.y[0]]],s:g.t300.slice(0,2).join(" ").trim()};
+      // Imagen enlazada: esquina inferior izquierda (10/20), tamaño de píxel (11/21 y 12/22), píxeles (13/23) y su IMAGEDEF (340)
+      else if(tipo==="IMAGE"){ if(sec==="ENTITIES"){ nImg++; imgs.push({def:g.v[340],l:g.l,x:g.x[0],y:g.y[0],ux:num(g.v[11]),uy:num(g.v[21]),vx:num(g.v[12]),vy:num(g.v[22]),w:num(g.v[13]),h:num(g.v[23])}); } }
+      else if(tipo!=="SEQEND"&&tipo!=="VERTEX") skip++;
+      if(e&&e.p.every(function(q){return isFinite(q[0])&&isFinite(q[1])})){ e.l=g.l; if(!e.s) delete e.s; return e; }
+      return null;
+    }
+    while(i<P.length){
+      var c=P[i][0], v=P[i][1];
+      if(c===0&&v==="SECTION"){ sec=(P[i+1]||[])[1]||""; i+=2; continue; }
+      if(c===0&&v==="ENDSEC"){ sec=""; i++; continue; }
+      if(sec==="TABLES"&&c===0&&v==="LAYER"){
+        var nm="", col=7; i++;
+        while(i<P.length&&P[i][0]!==0){ if(P[i][0]===2) nm=P[i][1]; if(P[i][0]===62) col=parseInt(P[i][1],10); i++; }
+        if(nm) cap[nm]={color:col}; continue;
+      }
+      if(sec==="BLOCKS"&&c===0){
+        if(v==="BLOCK"){ var bn="",bx=0,by=0; i++; while(i<P.length&&P[i][0]!==0){ if(P[i][0]===2) bn=P[i][1]; if(P[i][0]===10) bx=num(P[i][1]); if(P[i][0]===20) by=num(P[i][1]); i++; } blq={x:bx,y:by,ents:[]}; bloques[bn]=blq; continue; }
+        if(v==="ENDBLK"){ blq=null; i++; continue; }
+        if(blq){ var s0=skip, be=leerEnt(); skip=s0; if(be) blq.ents.push(be); continue; }
+      }
+      if((sec==="ENTITIES")&&c===0){ var e=leerEnt(); if(e) out.push(e); continue; }
+      if(sec==="OBJECTS"&&c===0&&v==="IMAGEDEF"){ var dh="",df=""; i++; while(i<P.length&&P[i][0]!==0){ if(P[i][0]===5) dh=P[i][1]; if(P[i][0]===1) df=P[i][1]; i++; } defs[dh]=df; continue; }
+      i++;
+    }
+    imgs.forEach(function(q){ q.archivo=(defs[q.def]||"").split(/[\\\/]/).pop(); });
+    // Descomponer los bloques: cada elemento pasa a coordenadas reales (escala, giro y punto de inserción)
+    var fin=[];
+    function expandir(ins,prof){
+      var b=bloques[ins.n]; if(!b||prof>5){ skip++; return; } if(!prof) nBlq++;
+      var co=Math.cos(ins.rot*Math.PI/180), si=Math.sin(ins.rot*Math.PI/180);
+      function T(q){ var x=(q[0]-b.x)*ins.sx, y=(q[1]-b.y)*ins.sy; return [ins.p[0][0]+x*co-y*si, ins.p[0][1]+x*si+y*co]; }
+      b.ents.forEach(function(be){
+        var n=JSON.parse(JSON.stringify(be)); if(n.l==="0") n.l=ins.l; n.p=n.p.map(T);
+        if(n.t==="INSERT"){ n.rot+=ins.rot; n.sx*=ins.sx; n.sy*=ins.sy; expandir(n,prof+1); return; }
+        if(n.r) n.r*=Math.abs(ins.sx);
+        if(n.t==="ARC"){ n.a0+=ins.rot; n.a1+=ins.rot; }
+        if(n.t==="TEXT"){ n.h*=Math.abs(ins.sy); n.rot+=ins.rot; }
+        fin.push(n);
+      });
+    }
+    out.forEach(function(e){ if(e.t==="INSERT") expandir(e,0); else fin.push(e); });
+    fin.forEach(function(e){ if(!cap[e.l]) cap[e.l]={color:7}; });
+    return {ents:fin,capas:cap,saltadas:skip,imagenes:nImg,imgs:imgs,bloques:nBlq,papel:papel};
+  }
+
+  // ---------- Vista ----------
+  function tam(){ var r=stage.getBoundingClientRect(), d=window.devicePixelRatio||1; cv.width=Math.round(r.width*d); cv.height=Math.round(r.height*d); ctx.setTransform(d,0,0,d,0,0); pintar(); }
+  function W(){ return cv.clientWidth; } function H(){ return cv.clientHeight; }
+  function aPantalla(x,y){ return [W()/2+(x-vista.cx)*vista.s, H()/2-(y-vista.cy)*vista.s]; }
+  function aMundo(px,py){ return [vista.cx+(px-W()/2)/vista.s, vista.cy-(py-H()/2)/vista.s]; }
+  function verTodo(){
+    var x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+    ents.forEach(function(e){ if(ocultas[e.l]) return; e.p.forEach(function(q){ var r=e.r||0; x0=Math.min(x0,q[0]-r); x1=Math.max(x1,q[0]+r); y0=Math.min(y0,q[1]-r); y1=Math.max(y1,q[1]+r); }); });
+    // Sin dibujo: se encuadran las imágenes (todas las del DXF, o el fondo elegido)
+    if(!isFinite(x0)){ var vf=fotos.filter(function(o){return o.dxf}); if(!vf.length&&(fondo||fotos[0])) vf=[fondo||fotos[0]];
+      vf.forEach(function(o){ x0=Math.min(x0,o.x); y1=Math.max(y1,o.y); x1=Math.max(x1,o.x+o.w*o.px); y0=Math.min(y0,o.y-o.h*(o.py||o.px)); }); }
+    if(!isFinite(x0)) return;
+    var dx=Math.max(x1-x0,1), dy=Math.max(y1-y0,1);
+    vista.cx=(x0+x1)/2; vista.cy=(y0+y1)/2; vista.s=Math.min(W()/dx,H()/dy)*0.9; pintar();
+  }
+
+  var pend=false;
+  function pintar(){ if(pend) return; pend=true; requestAnimationFrame(dibujar); }
+  function dibujar(){
+    pend=false; var w=W(), h=H();
+    ctx.clearRect(0,0,w,h);
+    // Fondo: el año elegido; encima, las capas activas (Catastro…)
+    fotos.forEach(function(o){
+      if(o.capa?!o.ver:o!==fondo) return;
+      var a=aPantalla(o.x,o.y);
+      if(!o.img){ ctx.save(); ctx.strokeStyle="rgba(255,255,255,.35)"; ctx.setLineDash([6,4]); ctx.strokeRect(a[0],a[1],o.w*o.px*vista.s,o.h*(o.py||o.px)*vista.s); ctx.restore(); return; }
+      ctx.imageSmoothingEnabled=vista.s*o.px<3;
+      ctx.drawImage(o.img,a[0],a[1],o.w*o.px*vista.s,o.h*(o.py||o.px)*vista.s);
+    });
+    ctx.globalAlpha=opPlano; ctx.lineWidth=1.4; ctx.lineJoin="round";
+    var selSet={}; sel.forEach(function(s){ selSet[s.e+":"+s.i]=1; });
+    ents.forEach(function(e,ei){
+      if(ocultas[e.l]) return;
+      var col=colorCapa(e.l); ctx.strokeStyle=col; ctx.fillStyle=col;
+      if(e.t==="PLINE"||e.t==="LINE"){
+        ctx.beginPath(); e.p.forEach(function(q,j){ var a=aPantalla(q[0],q[1]); if(j) ctx.lineTo(a[0],a[1]); else ctx.moveTo(a[0],a[1]); });
+        if(e.c) ctx.closePath(); ctx.stroke();
+      } else if(e.t==="CIRCLE"||e.t==="ARC"){
+        var a=aPantalla(e.p[0][0],e.p[0][1]); ctx.beginPath();
+        if(e.t==="CIRCLE") ctx.arc(a[0],a[1],e.r*vista.s,0,Math.PI*2);
+        else ctx.arc(a[0],a[1],e.r*vista.s,-e.a0*Math.PI/180,-e.a1*Math.PI/180,true);
+        ctx.stroke();
+      } else if(e.t==="POINT"){
+        var a=aPantalla(e.p[0][0],e.p[0][1]); ctx.beginPath(); ctx.arc(a[0],a[1],2.5,0,Math.PI*2); ctx.fill();
+        // Número y código de los puntos de topografía, cuando hay zoom suficiente
+        if(e.s&&vista.s>4){ ctx.font="11px JetBrains Mono, monospace"; ctx.textAlign="left"; ctx.textBaseline="bottom"; ctx.fillText(e.s,a[0]+4,a[1]-3); }
+      } else if(e.t==="TEXT"){
+        var px=e.h*vista.s; if(px<4) return;
+        var a=aPantalla(e.p[0][0],e.p[0][1]);
+        ctx.save(); ctx.translate(a[0],a[1]); ctx.rotate(-e.rot*Math.PI/180);
+        ctx.font=px.toFixed(1)+"px Archivo, sans-serif"; ctx.textAlign=e.al===1||e.al===4?"center":e.al===2?"right":"left"; ctx.textBaseline="alphabetic";
+        ctx.fillText(e.s,0,0); ctx.restore();
+      }
+    });
+    ctx.globalAlpha=1;
+    // Vértices visibles al editar y elegidos
+    if(modo!=="pan"&&vista.s>0.4){
+      ctx.fillStyle="rgba(255,255,255,.75)";
+      ents.forEach(function(e){ if(ocultas[e.l]||e.t==="TEXT") return; e.p.forEach(function(q){ var a=aPantalla(q[0],q[1]); ctx.fillRect(a[0]-2,a[1]-2,4,4); }); });
+    }
+    var cs=getComputedStyle(document.documentElement).getPropertyValue("--sel").trim()||"#e8590c";
+    ctx.strokeStyle=cs; ctx.fillStyle=cs; ctx.lineWidth=2;
+    sel.forEach(function(s){ var e=ents[s.e]; if(!e) return; var q=e.p[s.i]; if(!q) return; var a=aPantalla(q[0],q[1]); ctx.beginPath(); ctx.arc(a[0],a[1],6,0,Math.PI*2); ctx.stroke(); });
+    if(resalte!=null&&ents[resalte]){ var e=ents[resalte]; ctx.lineWidth=4; ctx.beginPath(); e.p.forEach(function(q,j){ var a=aPantalla(q[0],q[1]); if(j) ctx.lineTo(a[0],a[1]); else ctx.moveTo(a[0],a[1]); }); if(e.c) ctx.closePath(); ctx.stroke(); }
+    // Polilínea que se está uniendo: tramos, goma hasta el ratón y número de orden de cada punto
+    if(modo==="une"&&une.length){
+      ctx.beginPath(); une.forEach(function(q,j){ var a=aPantalla(q[0],q[1]); if(j) ctx.lineTo(a[0],a[1]); else ctx.moveTo(a[0],a[1]); });
+      if(une.length>2){ ctx.save(); ctx.globalAlpha=.18; ctx.fill(); ctx.restore(); }
+      if(ultimo){ ctx.lineTo(ultimo[0],ultimo[1]); } ctx.stroke();
+      ctx.font="600 12px JetBrains Mono, monospace"; ctx.textAlign="left"; ctx.textBaseline="bottom";
+      une.forEach(function(q,j){ var a=aPantalla(q[0],q[1]); ctx.beginPath(); ctx.arc(a[0],a[1],j?4:6,0,Math.PI*2); ctx.fill(); ctx.fillText(String(j+1),a[0]+6,a[1]-4); });
+    }
+    if(caja){ ctx.setLineDash([5,4]); ctx.lineWidth=1.5; ctx.strokeRect(Math.min(caja[0],caja[2]),Math.min(caja[1],caja[3]),Math.abs(caja[2]-caja[0]),Math.abs(caja[3]-caja[1])); ctx.setLineDash([]); }
+    $("empty").hidden=!!ents.length||!!fotos.length;
+  }
+
+  // ---------- Ratón y dedos ----------
+  var punteros={}, arrastre=null, caja=null, resalte=null, ultimo=null, une=[];
+  function cerca(px,py,sinTextos){
+    var mejor=null, d0=10*10;
+    ents.forEach(function(e,ei){ if(ocultas[e.l]||(sinTextos&&e.t==="TEXT")) return; e.p.forEach(function(q,j){ var a=aPantalla(q[0],q[1]), d=(a[0]-px)*(a[0]-px)+(a[1]-py)*(a[1]-py); if(d<d0){ d0=d; mejor={e:ei,i:j}; } }); });
+    return mejor;
+  }
+  // Línea o polilínea que pasa a menos de 6 px del ratón (para elegirla entera pinchando en un tramo)
+  function cercaTramo(px,py){
+    var mejor=null, d0=6;
+    ents.forEach(function(e,ei){
+      if(ocultas[e.l]||(e.t!=="PLINE"&&e.t!=="LINE")) return;
+      var n=e.p.length, tramos=e.c?n:n-1;
+      for(var j=0;j<tramos;j++){
+        var a=aPantalla(e.p[j][0],e.p[j][1]), b=aPantalla(e.p[(j+1)%n][0],e.p[(j+1)%n][1]), dx=b[0]-a[0], dy=b[1]-a[1], L=dx*dx+dy*dy;
+        var t=L?Math.max(0,Math.min(1,((px-a[0])*dx+(py-a[1])*dy)/L)):0, d=Math.hypot(px-a[0]-t*dx,py-a[1]-t*dy);
+        if(d<d0){ d0=d; mejor=ei; }
+      }
+    });
+    return mejor;
+  }
+  function posRel(ev){ var r=cv.getBoundingClientRect(); return [ev.clientX-r.left,ev.clientY-r.top]; }
+  cv.addEventListener("pointerdown",function(ev){
+    cv.setPointerCapture(ev.pointerId); var p=posRel(ev); punteros[ev.pointerId]=p;
+    var ids=Object.keys(punteros);
+    if(ids.length===2){ arrastre={tipo:"pinza",d:dist(),s:vista.s,c:centro()}; caja=null; return; }
+    if(modo==="edit"){
+      var h=cerca(p[0],p[1]);
+      if(h){
+        var ya=sel.some(function(s){return s.e===h.e&&s.i===h.i});
+        if(ev.shiftKey){ sel=ya?sel.filter(function(s){return !(s.e===h.e&&s.i===h.i)}):sel.concat([h]); }
+        else if(!ya) sel=[h];
+        arrastre={tipo:"vertice",ini:aMundo(p[0],p[1]),guardado:false}; infoSel(); pintar(); return;
+      }
+      // Pinchando en un tramo se elige la polilínea entera (todos sus vértices)
+      var tr=cercaTramo(p[0],p[1]);
+      if(tr!=null){
+        var todos=ents[tr].p.map(function(q,j){return {e:tr,i:j}});
+        sel=ev.shiftKey?sel.filter(function(s){return s.e!==tr}).concat(todos):todos;
+        arrastre={tipo:"vertice",ini:aMundo(p[0],p[1]),guardado:false}; infoSel(); pintar(); return;
+      }
+      if(!ev.shiftKey){ sel=[]; infoSel(); }
+    }
+    if(modo==="une"){
+      // Pinchando cerca del primer punto se cierra el recinto (también si el primero es un punto libre)
+      if(une.length>2){ var a0=aPantalla(une[0][0],une[0][1]); if(Math.hypot(a0[0]-p[0],a0[1]-p[1])<10){ crearUne(true); return; } }
+      var hu=cerca(p[0],p[1],true);
+      if(hu){ marcarUne(ents[hu.e].p[hu.i]); return; }
+    }
+    if(modo==="box"){ caja=[p[0],p[1],p[0],p[1]]; arrastre={tipo:"caja",suma:ev.shiftKey}; return; }
+    // En «Unir puntos», pinchar en vacío pone un punto libre; arrastrar mueve la vista
+    arrastre={tipo:"pan",p:p,cx:vista.cx,cy:vista.cy,libre:modo==="une"}; cv.style.cursor="grabbing";
+  });
+  cv.addEventListener("pointermove",function(ev){
+    var p=posRel(ev); ultimo=p; hud(p);
+    if(modo==="une"&&une.length) pintar();
+    if(!punteros[ev.pointerId]) return; punteros[ev.pointerId]=p;
+    if(!arrastre) return;
+    if(arrastre.tipo==="pinza"&&Object.keys(punteros).length===2){
+      var d=dist(), c=centro(), m=aMundo(arrastre.c[0],arrastre.c[1]);
+      vista.s=Math.max(1e-4,Math.min(5000,arrastre.s*d/arrastre.d));
+      var m2=aMundo(c[0],c[1]); vista.cx+=m[0]-m2[0]; vista.cy+=m[1]-m2[1]; pintar(); return;
+    }
+    if(arrastre.tipo==="pan"){ vista.cx=arrastre.cx-(p[0]-arrastre.p[0])/vista.s; vista.cy=arrastre.cy+(p[1]-arrastre.p[1])/vista.s; pintar(); }
+    else if(arrastre.tipo==="caja"){ caja[2]=p[0]; caja[3]=p[1]; pintar(); }
+    else if(arrastre.tipo==="vertice"&&sel.length){
+      var w=aMundo(p[0],p[1]), dx=w[0]-arrastre.ini[0], dy=w[1]-arrastre.ini[1];
+      if(!arrastre.guardado){ if(Math.abs(dx*vista.s)+Math.abs(dy*vista.s)<3) return; guardarHist(); arrastre.guardado=true; }
+      sel.forEach(function(s){ var q=ents[s.e].p[s.i]; q[0]+=dx; q[1]+=dy; });
+      arrastre.ini=w; cambiado(); pintar();
+    }
+  });
+  function fin(ev){
+    delete punteros[ev.pointerId]; cv.style.cursor="";
+    if(arrastre&&arrastre.tipo==="caja"&&caja){
+      var a=aMundo(Math.min(caja[0],caja[2]),Math.max(caja[1],caja[3])), b=aMundo(Math.max(caja[0],caja[2]),Math.min(caja[1],caja[3])), nuevos=[];
+      ents.forEach(function(e,ei){ if(ocultas[e.l]||e.t==="TEXT") return; e.p.forEach(function(q,j){ if(q[0]>=a[0]&&q[0]<=b[0]&&q[1]>=a[1]&&q[1]<=b[1]) nuevos.push({e:ei,i:j}); }); });
+      sel=arrastre.suma?sel.concat(nuevos.filter(function(n){return !sel.some(function(s){return s.e===n.e&&s.i===n.i})})):nuevos;
+      caja=null; infoSel();
+    }
+    if(arrastre&&arrastre.tipo==="vertice"&&arrastre.guardado){ medir(); infoSel(); }
+    if(arrastre&&arrastre.libre&&ev.type==="pointerup"){ var pl=posRel(ev); if(Math.hypot(pl[0]-arrastre.p[0],pl[1]-arrastre.p[1])<4){ vista.cx=arrastre.cx; vista.cy=arrastre.cy; arrastre=null; marcarUne(aMundo(pl[0],pl[1])); return; } }
+    arrastre=null; pintar();
+  }
+  cv.addEventListener("pointerup",fin); cv.addEventListener("pointercancel",fin);
+  cv.addEventListener("pointerleave",function(){ ultimo=null; });
+  function dist(){ var v=Object.values(punteros); return Math.hypot(v[0][0]-v[1][0],v[0][1]-v[1][1])||1; }
+  function centro(){ var v=Object.values(punteros); return [(v[0][0]+v[1][0])/2,(v[0][1]+v[1][1])/2]; }
+  cv.addEventListener("wheel",function(ev){
+    ev.preventDefault(); var p=posRel(ev), m=aMundo(p[0],p[1]), f=Math.exp(-ev.deltaY*0.0015);
+    vista.s=Math.max(1e-4,Math.min(5000,vista.s*f)); var m2=aMundo(p[0],p[1]); vista.cx+=m[0]-m2[0]; vista.cy+=m[1]-m2[1]; pintar(); hud(p);
+  },{passive:false});
+  function fmt(n,d){ return n.toLocaleString("es-ES",{minimumFractionDigits:d,maximumFractionDigits:d}); }
+  function hud(p){ if(!p) return; var m=aMundo(p[0],p[1]); $("hud").textContent="X "+fmt(m[0],2)+"  Y "+fmt(m[1],2)+"  ·  1 px = "+fmt(1/vista.s,3)+" m"; }
+
+  // ---------- Edición ----------
+  function guardarHist(){ hist.push(JSON.stringify(ents)); if(hist.length>40) hist.shift(); $("b-undo").disabled=false; }
+  function cambiado(){ $("b-save").disabled=!ents.length; if(nombre) $("nombre").textContent=(nombre==="ejemplo.dxf"?"Ejemplo con datos inventados":nombre)+" · "+ents.length+" elementos"+(hist.length?" · con cambios":""); }
+  function deshacer(){ if(!hist.length) return; ents=JSON.parse(hist.pop()); sel=[]; $("b-undo").disabled=!hist.length; cambiado(); pintarCapas(); infoSel(); medir(); pintar(); aviso("Deshecho."); }
+  function quitar(){
+    if(!sel.length) return; guardarHist();
+    var porEnt={}; sel.forEach(function(s){ (porEnt[s.e]=porEnt[s.e]||[]).push(s.i); });
+    var nPts=0, nEnt=0;
+    Object.keys(porEnt).forEach(function(k){
+      var e=ents[k], idx=porEnt[k].sort(function(a,b){return b-a});
+      if(e.t==="PLINE"){ idx.forEach(function(i){ e.p.splice(i,1); nPts++; }); if(e.p.length<2){ e.borrar=true; nEnt++; } }
+      else { e.borrar=true; nEnt++; nPts+=idx.length; }
+    });
+    ents=ents.filter(function(e){return !e.borrar});
+    sel=[]; infoSel(); medir(); cambiado(); pintar();
+    aviso("Quitados "+nPts+(nPts===1?" punto":" puntos")+(nEnt?" ("+nEnt+(nEnt===1?" elemento borrado entero)":" elementos borrados enteros)"):"")+". Deshacer con Ctrl+Z.");
+  }
+  // Quitar la línea o polilínea y dejar sus vértices como puntos sueltos (sin repetir los que ya hay)
+  function aPuntos(){
+    var lista=entsElegidas().filter(function(i){return ents[i].t==="PLINE"||ents[i].t==="LINE"});
+    if(!lista.length){ aviso("Elige una línea o polilínea: en «Editar puntos», pincha en uno de sus tramos.",true); return; }
+    guardarHist();
+    var ya={}; function clave(q,l){ return l+"|"+Math.round(q[0]*1000)+"|"+Math.round(q[1]*1000); }
+    ents.forEach(function(e){ if(e.t==="POINT") ya[clave(e.p[0],e.l)]=1; });
+    var nuevos=0;
+    lista.forEach(function(i){ var e=ents[i]; e.borrar=true;
+      e.p.forEach(function(q){ var k=clave(q,e.l); if(ya[k]) return; ya[k]=1; ents.push({t:"POINT",l:e.l,p:[[q[0],q[1]]]}); nuevos++; }); });
+    ents=ents.filter(function(e){return !e.borrar});
+    sel=[]; cambiado(); pintarCapas(); infoSel(); medir(); pintar();
+    aviso(lista.length+(lista.length===1?" línea quitada":" líneas quitadas")+"; quedan "+nuevos+" puntos en su capa. Con «Unir puntos» puedes volver a unirlos en el orden que quieras. Ctrl+Z para deshacer.");
+  }
+  $("b-expl").onclick=aPuntos;
+
+  // ---------- Unir puntos: tú marcas el orden y al cerrar da superficie y perímetro ----------
+  function marcarUne(q){
+    if(une.length>2&&une[0][0]===q[0]&&une[0][1]===q[1]){ crearUne(true); return; }
+    var u=une[une.length-1]; if(u&&u[0]===q[0]&&u[1]===q[1]) return;
+    if(!une.length){ var e0=ents.filter(function(e){return e.p.indexOf(q)>-1})[0]; if(e0&&$("une-capa").dataset.tocada!=="1"){ rellenarCapaUne(e0.l); } }
+    une.push([q[0],q[1]]); infoUne(); pintar();
+  }
+  function rellenarCapaUne(pref){
+    var S=$("une-capa"), act=pref||S.value; S.textContent="";
+    Object.keys(capas).sort().forEach(function(l){ var o=el("option",null,l); o.value=l; S.appendChild(o); });
+    var nv=el("option",null,"+ Capa nueva…"); nv.value="__nueva__"; S.appendChild(nv);
+    S.value=act&&[].some.call(S.options,function(o){return o.value===act})?act:"__nueva__";
+    if(S.value==="__nueva__"&&!$("une-nueva").value) $("une-nueva").value="RECINTO";
+    $("une-nueva").hidden=S.value!=="__nueva__";
+  }
+  $("une-capa").onchange=function(){ this.dataset.tocada="1"; $("une-nueva").hidden=this.value!=="__nueva__"; if(!$("une-nueva").hidden) $("une-nueva").focus(); };
+  function infoUne(){
+    var I=$("une-info");
+    if(!une.length){ I.textContent="Pincha en el orden de la polilínea: sobre un punto del plano se engancha a él; en vacío pone un punto nuevo. Pinchando otra vez el primero se cierra. Arrastrando mueves la vista."; return; }
+    I.textContent=une.length+(une.length===1?" punto":" puntos")+(une.length>2?" · superficie "+fmt(area(une),2)+" m² · perímetro "+fmt(largo(une,true),2)+" m (si lo cierras)":une.length===2?" · "+fmt(largo(une,false),2)+" m":"")+".";
+  }
+  function crearUne(cerrada){
+    if(une.length<(cerrada?3:2)){ aviso(cerrada?"Para cerrar un recinto hacen falta al menos 3 puntos.":"Marca al menos 2 puntos.",true); return; }
+    var dest=$("une-capa").value;
+    if(dest==="__nueva__"){ dest=$("une-nueva").value.trim().toUpperCase().replace(/[<>\/\\":;?*|=,]/g,"_"); if(!dest){ aviso("Escribe el nombre de la capa nueva.",true); $("une-nueva").focus(); return; } }
+    guardarHist();
+    if(!capas[dest]) capas[dest]={color:[1,2,3,4,5,6,30,140][Object.keys(capas).length%8]};
+    delete ocultas[dest];
+    var p=une.map(function(q){return [q[0],q[1]]}); ents.push({t:"PLINE",l:dest,c:cerrada,p:p}); une=[];
+    cambiado(); pintarCapas(); rellenarCapaUne(dest); $("med-capa").value=dest; medir(); resalte=ents.length-1; infoUne(); pintar();
+    aviso(cerrada?"Recinto creado en la capa "+dest+": superficie "+fmt(area(p),2)+" m², perímetro "+fmt(largo(p,true),2)+" m. Ctrl+Z para deshacer.":"Línea creada en la capa "+dest+": "+fmt(largo(p,false),2)+" m. Ctrl+Z para deshacer.");
+  }
+  $("une-cerrar").onclick=function(){crearUne(true)}; $("une-abierta").onclick=function(){crearUne(false)};
+  $("une-atras").onclick=function(){ une.pop(); infoUne(); pintar(); };
+  $("une-cancelar").onclick=function(){ une=[]; infoUne(); pintar(); };
+
+  function infoSel(){
+    $("b-del").disabled=!sel.length;
+    $("b-expl").disabled=!entsElegidas().some(function(i){return ents[i]&&(ents[i].t==="PLINE"||ents[i].t==="LINE")});
+    var I=$("sel-info");
+    controlesSel();
+    if(!sel.length){ I.textContent=modo==="box"?"Nada elegido. Arrastra un recuadro sobre los puntos (con Mayús. se añaden).":"Nada elegido. En «Editar puntos», pincha un punto o un vértice (con Mayús. eliges varios)."; return; }
+    if(sel.length===1){ var s=sel[0], e=ents[s.e], q=e.p[s.i];
+      I.textContent=({POINT:"Punto",LINE:"Extremo de línea",PLINE:"Vértice "+(s.i+1)+" de "+e.p.length+" de una polilínea",CIRCLE:"Centro de círculo",ARC:"Centro de arco"}[e.t]||e.t)+" · capa "+e.l+" · X "+fmt(q[0],3)+"  Y "+fmt(q[1],3);
+      return; }
+    var ee=entsElegidas();
+    if(ee.length===1&&ents[ee[0]].t==="PLINE"&&sel.length===ents[ee[0]].p.length){ var pe=ents[ee[0]];
+      I.textContent="Polilínea entera de "+pe.p.length+" vértices · capa "+pe.l+(pe.c?" · superficie "+fmt(area(pe.p),2)+" m²":" · "+fmt(largo(pe.p,false),2)+" m")+". Arrástrala para moverla, o «Quitar línea, dejar puntos».";
+      return; }
+    var cs={}; sel.forEach(function(s){ cs[ents[s.e].l]=1; });
+    I.textContent=sel.length+" puntos elegidos en "+Object.keys(cs).length+(Object.keys(cs).length===1?" capa":" capas")+" ("+Object.keys(cs).slice(0,4).join(", ")+(Object.keys(cs).length>4?"…":"")+"). Supr para quitarlos o arrástralos.";
+  }
+  // ---------- Panel de selección: coordenadas exactas, desplazamiento y cambio de capa ----------
+  function entsElegidas(){ var v={}; sel.forEach(function(s){ v[s.e]=1; }); return Object.keys(v).map(Number); }
+  function controlesSel(){
+    var C=$("sel-ctl"); C.hidden=!sel.length; C.style.display=sel.length?"flex":"none"; if(!sel.length) return;
+    $("sel-xy").hidden=sel.length!==1;
+    if(sel.length===1){ var q=ents[sel[0].e].p[sel[0].i]; $("s-x").value=q[0].toFixed(3); $("s-y").value=q[1].toFixed(3); }
+    var S=$("s-capa"), act=S.value; S.textContent="";
+    Object.keys(capas).sort().forEach(function(l){ var o=el("option",null,l); o.value=l; S.appendChild(o); });
+    var nv=el("option",null,"+ Capa nueva…"); nv.value="__nueva__"; S.appendChild(nv);
+    var la=ents[sel[0].e].l; S.value=act&&[].some.call(S.options,function(o){return o.value===act})?act:la;
+    $("s-nueva").hidden=S.value!=="__nueva__";
+    var ne=entsElegidas().length, hay=entsElegidas().some(function(i){return ents[i].t==="PLINE"||ents[i].t==="LINE"});
+    $("s-nota").textContent=hay?"Al cambiar de capa se pasa entera la línea o polilínea del punto elegido ("+ne+(ne===1?" elemento":" elementos")+").":"";
+  }
+  $("s-capa").onchange=function(){ $("s-nueva").hidden=this.value!=="__nueva__"; if(!$("s-nueva").hidden) $("s-nueva").focus(); };
+  function moverSel(dx,dy){
+    if(!sel.length||!isFinite(dx)||!isFinite(dy)||(!dx&&!dy)) return false;
+    guardarHist(); var hechos={};
+    sel.forEach(function(s){ var k=s.e+":"+s.i; if(hechos[k]) return; hechos[k]=1; var q=ents[s.e].p[s.i]; q[0]+=dx; q[1]+=dy; });
+    cambiado(); medir(); infoSel(); pintar(); return true;
+  }
+  $("s-mover").onclick=function(){ if(sel.length!==1) return; var q=ents[sel[0].e].p[sel[0].i], x=parseFloat($("s-x").value), y=parseFloat($("s-y").value);
+    if(!isFinite(x)||!isFinite(y)){ aviso("Escribe la X y la Y.",true); return; }
+    if(moverSel(x-q[0],y-q[1])) aviso("Punto movido a X "+fmt(x,3)+"  Y "+fmt(y,3)+". Ctrl+Z para deshacer."); };
+  $("s-desp").onclick=function(){ var dx=parseFloat($("s-dx").value)||0, dy=parseFloat($("s-dy").value)||0;
+    if(moverSel(dx,dy)) aviso(sel.length+(sel.length===1?" punto desplazado":" puntos desplazados")+" "+fmt(dx,3)+" m en X y "+fmt(dy,3)+" m en Y. Ctrl+Z para deshacer."); else aviso("Escribe cuánto desplazar en X o en Y.",true); };
+  $("s-cambiar").onclick=function(){
+    var dest=$("s-capa").value;
+    if(dest==="__nueva__"){ dest=$("s-nueva").value.trim().toUpperCase().replace(/[<>\/\\":;?*|=,]/g,"_"); if(!dest){ aviso("Escribe el nombre de la capa nueva.",true); $("s-nueva").focus(); return; } }
+    var lista=entsElegidas().filter(function(i){return ents[i].l!==dest}); if(!lista.length){ aviso("Ya están en la capa "+dest+".",true); return; }
+    guardarHist();
+    if(!capas[dest]) capas[dest]={color:[1,2,3,4,5,6,30,140][Object.keys(capas).length%8]};
+    lista.forEach(function(i){ ents[i].l=dest; }); delete ocultas[dest];
+    cambiado(); pintarCapas(); medir(); infoSel(); pintar();
+    aviso(lista.length+(lista.length===1?" elemento pasado":" elementos pasados")+" a la capa "+dest+". Ctrl+Z para deshacer.");
+  };
+
+  function ponModo(m){
+    modo=m; ["pan","edit","box","une"].forEach(function(x){ var b=$("m-"+x); b.classList.toggle("on",x===m); b.setAttribute("aria-pressed",x===m?"true":"false"); });
+    cv.classList.toggle("edit",m!=="pan");
+    $("p-une").hidden=m!=="une"; if(m==="une"){ sel=[]; rellenarCapaUne(); } else une=[];
+    infoUne(); infoSel(); pintar();
+  }
+  $("m-pan").onclick=function(){ponModo("pan")}; $("m-edit").onclick=function(){ponModo("edit")}; $("m-box").onclick=function(){ponModo("box")}; $("m-une").onclick=function(){ponModo("une")};
+  $("b-del").onclick=quitar; $("b-undo").onclick=deshacer; $("b-fit").onclick=verTodo;
+  document.addEventListener("keydown",function(ev){
+    if(/INPUT|SELECT|TEXTAREA/.test((ev.target||{}).tagName||"")||$("dlg").open) return;
+    if(modo==="une"&&une.length&&(ev.key==="Enter"||ev.key==="Backspace"||ev.key==="Escape")){
+      ev.preventDefault(); if(ev.key==="Enter") crearUne(true); else if(ev.key==="Backspace") une.pop(); else une=[]; infoUne(); pintar(); return; }
+    if(ev.key==="u"||ev.key==="U"){ ponModo("une"); return; }
+    if((ev.key==="x"||ev.key==="X")&&!$("b-expl").disabled){ aPuntos(); return; }
+    if(ev.key==="Delete"||ev.key==="Backspace"){ if(sel.length){ ev.preventDefault(); quitar(); } }
+    else if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==="z"){ ev.preventDefault(); deshacer(); }
+    else if(ev.key==="Escape"){ sel=[]; infoSel(); pintar(); }
+    else if(ev.key==="v"||ev.key==="V") ponModo("pan");
+    else if(ev.key==="e"||ev.key==="E") ponModo("edit");
+    else if(ev.key==="r"||ev.key==="R") ponModo("box");
+    else if(ev.key==="f"||ev.key==="F") verTodo();
+    else if(ev.key===",") pasoAno(-1);
+    else if(ev.key===".") pasoAno(1);
+  });
+
+  // ---------- Capas ----------
+  function pintarCapas(){
+    var B=$("layers"); B.textContent="";
+    var cuenta={}; ents.forEach(function(e){ cuenta[e.l]=(cuenta[e.l]||0)+1; });
+    var nombres=Object.keys(capas).filter(function(l){return cuenta[l]}).sort();
+    if(!nombres.length){ B.appendChild(el("span","meta","Abre un plano para ver sus capas.")); }
+    nombres.forEach(function(l,i){
+      var r=el("label","layer"), ck=el("input"); ck.type="checkbox"; ck.checked=!ocultas[l]; ck.id="cap-"+i;
+      ck.onchange=function(){ if(ck.checked) delete ocultas[l]; else ocultas[l]=1; sel=sel.filter(function(s){return !ocultas[ents[s.e].l]}); infoSel(); pintar(); };
+      var sw=el("span","sw"); sw.style.background=colorCapa(l);
+      r.appendChild(ck); r.appendChild(sw); r.appendChild(el("span","n",l)); r.appendChild(el("span","c",String(cuenta[l]))); B.appendChild(r);
+    });
+    var S=$("med-capa"), v=S.value; S.textContent=""; var o0=el("option",null,"Elige una capa…"); o0.value=""; S.appendChild(o0);
+    nombres.forEach(function(l){ var o=el("option",null,l+" ("+cuenta[l]+")"); o.value=l; if(l===v) o.selected=true; S.appendChild(o); });
+  }
+  $("cap-todas").onclick=function(){ ocultas={}; pintarCapas(); pintar(); };
+  $("cap-ninguna").onclick=function(){ Object.keys(capas).forEach(function(l){ocultas[l]=1}); sel=[]; infoSel(); pintarCapas(); pintar(); };
+
+  // ---------- Medición: superficie (Gauss) y perímetro de recintos cerrados, longitud de líneas ----------
+  function area(p){ var a=0; for(var i=0;i<p.length;i++){ var q=p[i], r=p[(i+1)%p.length]; a+=q[0]*r[1]-r[0]*q[1]; } return Math.abs(a)/2; }
+  function largo(p,cerr){ var s=0; for(var i=1;i<p.length;i++) s+=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]); if(cerr&&p.length>2) s+=Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1]); return s; }
+  function medir(){
+    var l=$("med-capa").value, R=$("med-res"); R.textContent=""; resalte=null;
+    if(!l) return;
+    var filas=[], tA=0, tL=0, nP=0;
+    ents.forEach(function(e,ei){
+      if(e.l!==l) return;
+      var cerr=e.t==="PLINE"&&(e.c||(e.p.length>3&&Math.hypot(e.p[0][0]-e.p[e.p.length-1][0],e.p[0][1]-e.p[e.p.length-1][1])<0.005));
+      if(e.t==="PLINE"&&cerr&&e.hueco){ var ah=area(e.p); tA-=ah; filas.push([ei,"Hueco",-ah,largo(e.p,e.c)]); }
+      else if(e.t==="PLINE"&&cerr){ var a=area(e.p), pe=largo(e.p,e.c); tA+=a; filas.push([ei,"Recinto",a,pe]); }
+      else if(e.t==="PLINE"||e.t==="LINE"){ var lg=largo(e.p,false); tL+=lg; filas.push([ei,"Línea",null,lg]); }
+      else if(e.t==="CIRCLE"){ var ac=Math.PI*e.r*e.r; tA+=ac; filas.push([ei,"Círculo",ac,2*Math.PI*e.r]); }
+      else if(e.t==="POINT") nP++;
+    });
+    if(!filas.length){ R.appendChild(el("p","meta",nP?"La capa solo tiene "+nP+" puntos sueltos: no hay recintos ni líneas que medir.":"Esta capa no tiene recintos ni líneas.")); return; }
+    var t=el("table"), th=el("thead"), tr=el("tr"); ["Elemento","Superficie m²","Perímetro / long. m"].forEach(function(x){tr.appendChild(el("th",null,x))}); th.appendChild(tr); t.appendChild(th);
+    var tb=el("tbody"); var n=0;
+    filas.forEach(function(f){ n++; var r=el("tr","pick"); r.appendChild(el("td",null,f[1]+" "+n)); r.appendChild(el("td",null,f[2]==null?"—":fmt(f[2],2))); r.appendChild(el("td",null,fmt(f[3],2)));
+      r.onclick=function(){ resalte=f[0]; var e=ents[f[0]], x=e.p.map(function(q){return q[0]}), y=e.p.map(function(q){return q[1]}); vista.cx=(Math.min.apply(0,x)+Math.max.apply(0,x))/2; vista.cy=(Math.min.apply(0,y)+Math.max.apply(0,y))/2; pintar(); };
+      tb.appendChild(r); });
+    t.appendChild(tb);
+    var tf=el("tfoot"), r2=el("tr"); r2.appendChild(el("td",null,"Total")); r2.appendChild(el("td",null,tA?fmt(tA,2):"—")); r2.appendChild(el("td",null,tL?fmt(tL,2)+" (líneas)":"—")); tf.appendChild(r2); t.appendChild(tf);
+    R.appendChild(t);
+    if(nP) R.appendChild(el("p","meta","Además hay "+nP+" puntos sueltos en esta capa."));
+    pintar();
+  }
+  $("med-capa").onchange=medir;
+
+  // ---------- Ortofotos: varias imágenes con su georreferencia (world file) ----------
+  // Las JPG son fondos (se ve uno, el año elegido); las PNG con transparencia o de Catastro van encima como capas
+  // Admite coma decimal (los .jgw hechos con Windows en español la llevan)
+  function leerWorld(t){ var v=t.trim().split(/\s+/).map(function(s){return parseFloat(s.replace(",","."))}); if(v.length<6||v.some(isNaN)) return null; if(Math.abs(v[1])>1e-9||Math.abs(v[2])>1e-9) return {giro:true}; return {px:v[0],py:-v[3],x:v[4]-v[0]/2,y:v[5]-v[3]/2}; }
+  function base(n){ return n.replace(/\.[^.]+$/,"").toLowerCase(); }
+  function etiqueta(n){
+    var s=n.replace(/\.[^.]+$/,""), m=/(19[2-9]\d|20[0-4]\d)(?:\s*-\s*(19\d\d|20\d\d))?/.exec(s);
+    if(/catastro(?!n)/i.test(s)) return {t:"Catastro",k:9999};
+    if(/mtn\s*actual|mapa\s*r[aá]ster/i.test(s)) return {t:"MTN actual",k:9997};
+    if(!m&&/catastron|minuta/i.test(s)) return {t:"Minutas MTN50 (catastrones)",k:1920};
+    if(!m&&/planimetr/i.test(s)) return {t:"Planimetría",k:1890};
+    if(/actual/i.test(s)) return {t:"Actual",k:9998};
+    if(/sigpac/i.test(s)) return {t:"SIGPAC 1997-2003",k:2000};
+    if(/olistat/i.test(s)) return {t:"OLISTAT 1997-98",k:1997.5};
+    if(m) return {t:s.replace(/^orto\s*/i,""),k:parseFloat(m[1])};
+    return {t:s,k:5000};
+  }
+  function cargarOrto(files){
+    var lista=Array.prototype.slice.call(files||[]), worlds={}, imgs=[];
+    lista.forEach(function(f){ if(/\.(jgw|pgw|tfw|wld|j2w|gfw)$/i.test(f.name)) worlds[base(f.name)]=f; else if(/^image\//.test(f.type)||/\.(jpe?g|png|webp|gif)$/i.test(f.name)) imgs.push(f); });
+    if(!imgs.length){ aviso("Sube las imágenes (JPG o PNG) con sus archivos de georreferencia (.jgw, .pgw).",true); return; }
+    Promise.all(imgs.map(function(f){
+      return Promise.all([
+        new Promise(function(ok,ko){ var im=new Image(); im.onload=function(){ok(im)}; im.onerror=function(){ko()}; im.src=URL.createObjectURL(f); }),
+        worlds[base(f.name)]?worlds[base(f.name)].text():Promise.resolve(null)
+      ]).then(function(r){ return {f:f,img:r[0],w:r[1]?leerWorld(r[1]):null}; });
+    })).then(function(rs){
+      var sinGeo=0, giro=0, delDXF=0;
+      rs.forEach(function(r){
+        // Imagen que pide el DXF abierto: se coloca donde dice el DXF
+        var esp=fotos.filter(function(q){return q.dxf&&q.nombre.toLowerCase()===r.f.name.toLowerCase()});
+        if(esp.length){ esp.forEach(function(q){ q.img=r.img; }); delDXF++; return; }
+        if(r.w&&r.w.giro){ giro++; return; }
+        var e=etiqueta(r.f.name), o={nombre:r.f.name,t:e.t,k:e.k,img:r.img,w:r.img.naturalWidth,h:r.img.naturalHeight,capa:/\.png$/i.test(r.f.name)||/catastro/i.test(r.f.name),ver:true};
+        if(r.w){ o.x=r.w.x; o.y=r.w.y; o.px=r.w.px; }
+        else{ // Sin .jgw: si otra foto tiene el mismo tamaño en píxeles, se coloca igual que ella
+          var gemela=fotos.filter(function(q){return q.w===o.w&&q.h===o.h&&q.x!=null})[0];
+          if(gemela){ o.x=gemela.x; o.y=gemela.y; o.px=gemela.px; }
+          else{ var c=ents.length?centroPlano():[0,0]; o.px=parseFloat($("o-p").value)||0.1; o.x=c[0]-o.w*o.px/2; o.y=c[1]+o.h*o.px/2; sinGeo++; }
+        }
+        fotos=fotos.filter(function(q){return q.nombre!==o.nombre}); fotos.push(o);
+      });
+      fotos.sort(function(a,b){return a.k-b.k});
+      var fondos=fotos.filter(function(q){return !q.capa});
+      if(fondos.length&&(fondo==null||fondos.indexOf(fondo)<0)) fondo=fondos[fondos.length-1];
+      pintarFotos(); if(!ents.length) verTodo(); pintar();
+      aviso(rs.length+(rs.length===1?" imagen cargada":" imágenes cargadas")+(delDXF?" · "+delDXF+" colocadas donde dice el DXF":"")+(giro?" · "+giro+" con giro no se pueden colocar":"")+(sinGeo?" · "+sinGeo+" sin georreferencia: centradas en el plano; colócalas con X, Y y metros por píxel":"")+".",!!(giro||sinGeo));
+    }).catch(function(){ aviso("No se ha podido abrir alguna imagen.",true); });
+  }
+  // ---------- Imágenes enlazadas del DXF (montajes): se colocan donde dice el DXF ----------
+  // Esta página no puede leer archivos del PC: se eligen con «Ortofotos» y se colocan solas por su nombre
+  function ponerImgsDXF(lista){
+    fotos=fotos.filter(function(o){return !o.dxf}); var gir=0;
+    (lista||[]).forEach(function(q,idx){
+      if(!(q.w>0&&q.h>0&&q.ux>0&&q.vy>0)) return;
+      if(Math.abs(q.uy)>1e-9||Math.abs(q.vx)>1e-9){ gir++; return; }
+      fotos.push({nombre:q.archivo||"imagen "+(idx+1),t:(q.archivo||"imagen")+" · "+q.l,k:-1000+idx,img:null,w:q.w,h:q.h,px:q.ux,py:q.vy,x:q.x,y:q.y+q.h*q.vy,capa:true,ver:true,dxf:true});
+    });
+    fotos.sort(function(a,b){return a.k-b.k}); pintarFotos();
+    var nombres=[]; fotos.forEach(function(o){ if(o.dxf&&nombres.indexOf(o.nombre)<0) nombres.push(o.nombre); });
+    if(nombres.length) setTimeout(function(){ aviso("Este plano lleva "+nombres.length+(nombres.length===1?" imagen enlazada":" imágenes enlazadas")+" ("+nombres.slice(0,3).join(", ")+(nombres.length>3?"…":"")+"). Pulsa «Ortofotos» y elígelas de la carpeta del DXF (puedes elegirlas todas a la vez): se colocan solas donde dice el DXF.",true); },50);
+    return gir;
+  }
+  function centroPlano(){ var x=0,y=0,n=0; ents.forEach(function(e){ e.p.forEach(function(q){ x+=q[0]; y+=q[1]; n++; }); }); return n?[x/n,y/n]:[0,0]; }
+  function pintarFotos(){
+    var B=$("fotos"); B.textContent="";
+    if(!fotos.length){ B.appendChild(el("span","meta","Sin ortofotos. Súbelas con sus .jgw (puedes elegir varias a la vez).")); $("o-pasos").hidden=true; return; }
+    var fondos=fotos.filter(function(q){return !q.capa});
+    $("o-pasos").hidden=fondos.length<2;
+    fotos.forEach(function(o,i){
+      var r=el("label","layer"), inp=el("input"); inp.id="foto-"+i;
+      if(o.capa){ inp.type="checkbox"; inp.checked=o.ver; inp.onchange=function(){ o.ver=inp.checked; pintar(); }; }
+      else{ inp.type="radio"; inp.name="fondo"; inp.checked=o===fondo; inp.onchange=function(){ fondo=o; pintarFotos(); pintar(); }; }
+      r.appendChild(inp); r.appendChild(el("span","n",o.t)); r.appendChild(el("span","c",!o.img?"falta":o.dxf?"DXF":o.capa?"capa":fmt(o.px,2)+" m/px")); B.appendChild(r);
+    });
+    var o=fondo||fotos[0]; $("o-x").value=o.x.toFixed(2); $("o-y").value=o.y.toFixed(2); $("o-p").value=o.px;
+  }
+  // Pasar de un año a otro (botones ◀ ▶ o teclas , y .)
+  function pasoAno(d){ var fondos=fotos.filter(function(q){return !q.capa}); if(fondos.length<2) return; var i=fondos.indexOf(fondo); fondo=fondos[(i+d+fondos.length)%fondos.length]; pintarFotos(); pintar(); aviso("Ortofoto: "+fondo.t); }
+  // ---------- Petición de ortofotos para Claude (la página no puede descargarlas) ----------
+  // Mapas del IGN (planimetrías s. XIX, minutas y primeras ediciones del MTN, MTN actual) junto a las ortofotos, por fecha
+  var CATALOGO=[["Planimetría (s. XIX–XX)",0],["Minutas MTN50 (catastrones)",0],["MTN50 1.ª edición",0],["1956 Americano",1],["MTN25 1.ª edición",0],["MTN actual (mapa ráster)",0],["1973-86 Interministerial",0],["1981-86 Nacional",0],["OLISTAT 1997-98",0],["SIGPAC 1997-2003",1]];
+  for(var an=2004;an<=2024;an++) CATALOGO.push(["PNOA "+an,[2004,2013,2022].indexOf(an)>-1?1:0]);
+  CATALOGO.push(["Actual (máxima actualidad)",1],["Catastro (parcelas y construcciones)",1]);
+  (function(){
+    var B=$("pedir-lista");
+    CATALOGO.forEach(function(c,i){ var l=el("label"), k=el("input"); k.type="checkbox"; k.id="pedir-"+i; k.checked=!!c[1]; k.onchange=textoPeticion; l.appendChild(k); l.appendChild(document.createTextNode(c[0])); B.appendChild(l); });
+  })();
+  function zonaPlano(){
+    var x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+    ents.forEach(function(e){ if(ocultas[e.l]) return; e.p.forEach(function(q){ x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); y0=Math.min(y0,q[1]); y1=Math.max(y1,q[1]); }); });
+    if(!isFinite(x0)){ var a=aMundo(0,H()), b=aMundo(W(),0); x0=a[0]; y0=a[1]; x1=b[0]; y1=b[1]; }
+    var m=15; return [Math.floor(x0-m),Math.floor(y0-m),Math.ceil(x1+m),Math.ceil(y1+m)];
+  }
+  function textoPeticion(){
+    var eleg=CATALOGO.filter(function(c,i){ return $("pedir-"+i).checked; }).map(function(c){return c[0]});
+    var z=zonaPlano(), plano=nombre&&nombre!=="ejemplo.dxf"?" del plano «"+nombre+"»":"";
+    $("pedir-texto").value=eleg.length?"Descárgame para el Editor DXF estas ortofotos: "+eleg.join(", ")+". Zona"+plano+": X "+z[0]+" a "+z[2]+", Y "+z[1]+" a "+z[3]+" (ETRS89 UTM huso 30), a 0,1 m por píxel, con sus .jgw. Enséñamelas antes de guardarlas.":"";
+  }
+  $("pedir").addEventListener("toggle",textoPeticion);
+  $("pedir-todos").onclick=function(){ CATALOGO.forEach(function(c,i){ $("pedir-"+i).checked=true; }); textoPeticion(); };
+  $("pedir-ninguno").onclick=function(){ CATALOGO.forEach(function(c,i){ $("pedir-"+i).checked=false; }); textoPeticion(); };
+  $("pedir-copiar").onclick=function(){
+    textoPeticion(); var t=$("pedir-texto").value, b=this; if(!t){ aviso("Marca al menos un año o Catastro.",true); return; }
+    try{ navigator.clipboard.writeText(t).then(function(){ b.textContent="Copiada: pégala en el chat"; aviso("Petición copiada. Pégala en el chat con Claude."); },function(){ $("pedir-texto").select(); aviso("Selecciona el texto de abajo y cópialo con Ctrl+C.",true); }); }
+    catch(e){ $("pedir-texto").select(); aviso("Selecciona el texto de abajo y cópialo con Ctrl+C.",true); }
+  };
+
+  $("o-ant").onclick=function(){pasoAno(-1)}; $("o-sig").onclick=function(){pasoAno(1)};
+  $("o-aplicar").onclick=function(){ var o=fondo||fotos[0]; if(!o){ aviso("Primero sube la imagen de la ortofoto.",true); return; }
+    var x=parseFloat($("o-x").value), y=parseFloat($("o-y").value), p=parseFloat($("o-p").value);
+    if(!isFinite(x)||!isFinite(y)||!(p>0)){ aviso("Escribe la X, la Y y los metros por píxel.",true); return; }
+    o.x=x; o.y=y; o.px=p; pintarFotos(); pintar(); aviso("Ortofoto «"+o.t+"» recolocada."); };
+  $("o-quitar").onclick=function(){ fotos=[]; fondo=null; pintarFotos(); pintar(); };
+  $("o-op").oninput=function(){ opPlano=parseFloat(this.value); pintar(); };
+  $("f-img").onchange=function(){ cargarOrto(this.files); this.value=""; };
+
+  // ---------- Abrir plano ----------
+  function abrirDXF(f){
+    return f.arrayBuffer().then(function(buf){
+      if(/^AutoCAD Binary DXF/.test(new TextDecoder("latin1").decode(buf.slice(0,22)))){ aviso(f.name+" es un DXF binario. En ZWCAD guárdalo como DXF de texto (ASCII) y ábrelo otra vez.",true); return; }
+      var r=leerDXF(decodificar(buf));
+      if(!r.ents.length&&!r.imgs.length){ aviso("No he encontrado dibujo en "+f.name+".",true); return; }
+      ents=r.ents; capas=r.capas; saltadas=r.saltadas; ocultas={}; sel=[]; hist=[]; nombre=f.name;
+      var gir=ponerImgsDXF(r.imgs,f.name);
+      $("b-undo").disabled=true; cambiado(); pintarCapas(); infoSel(); medir(); verTodo();
+      aviso("Plano abierto: "+ents.length+" elementos en "+Object.keys(capas).length+" capas."+(r.imgs.length?" Lleva "+r.imgs.length+(r.imgs.length===1?" imagen enlazada":" imágenes enlazadas")+": las estoy buscando."+(gir?" "+gir+" están giradas y no se pueden colocar.":""):"")+(r.bloques?" "+r.bloques+(r.bloques===1?" bloque descompuesto":" bloques descompuestos")+" en sus líneas y textos.":"")+(saltadas?" No se muestran "+saltadas+" elementos de tipos que esta herramienta no edita (sombreados, cotas…); no se guardarán en la copia.":"")+(r.papel?" Las presentaciones (cajetín y ventanas) no se cargan: siguen en tu DXF original y se ven en ZWCAD.":""), !!saltadas);
+    }).catch(function(err){ aviso("No se ha podido leer "+f.name+" ("+((err&&err.message)||"error")+").",true); });
+  }
+  $("f-dxf").onchange=function(){ if(this.files[0]) abrirDXF(this.files[0]); this.value=""; };
+  ["dragover","dragenter"].forEach(function(t){ stage.addEventListener(t,function(e){ e.preventDefault(); $("empty").classList.add("over"); }); });
+  stage.addEventListener("dragleave",function(){ $("empty").classList.remove("over"); });
+  stage.addEventListener("drop",function(e){ e.preventDefault(); $("empty").classList.remove("over");
+    var fs=Array.prototype.slice.call(e.dataTransfer.files||[]), d=fs.filter(function(f){return /\.dxf$/i.test(f.name)})[0];
+    var gml=fs.filter(function(f){return /\.(gml|xml)$/i.test(f.name)}), resto=fs.filter(function(f){return !/\.(dxf|gml|xml)$/i.test(f.name)});
+    // El DXF reemplaza el dibujo: los GML se añaden después, encima
+    (d?abrirDXF(d):Promise.resolve()).then(function(){ if(gml.length) cargarGML(gml); });
+    if(resto.length) cargarOrto(resto); });
+
+  // ---------- GML (Catastro INSPIRE, validación gráfica, construcciones): cada archivo es una capa más ----------
+  var COLORES_GML=[1,3,5,6,30,4,140,210], nGML=0;
+  // ETRS89 geográficas → UTM huso 30 (para GML que vengan en EPSG:4258 o 4326)
+  function aUTM30(lat,lon){
+    var a=6378137,f=1/298.257222101,e2=f*(2-f),k0=0.9996,l0=-3*Math.PI/180,ep2=e2/(1-e2);
+    var fi=lat*Math.PI/180,la=lon*Math.PI/180,N=a/Math.sqrt(1-e2*Math.sin(fi)*Math.sin(fi)),T=Math.tan(fi)*Math.tan(fi),C=ep2*Math.cos(fi)*Math.cos(fi),A=Math.cos(fi)*(la-l0);
+    var M=a*((1-e2/4-3*e2*e2/64-5*e2*e2*e2/256)*fi-(3*e2/8+3*e2*e2/32+45*e2*e2*e2/1024)*Math.sin(2*fi)+(15*e2*e2/256+45*e2*e2*e2/1024)*Math.sin(4*fi)-(35*e2*e2*e2/3072)*Math.sin(6*fi));
+    var x=k0*N*(A+(1-T+C)*A*A*A/6+(5-18*T+T*T+72*C-58*ep2)*Math.pow(A,5)/120)+500000;
+    var y=k0*(M+N*Math.tan(fi)*(A*A/2+(5-T+9*C+4*C*C)*Math.pow(A,4)/24+(61-58*T+T*T+600*C-330*ep2)*Math.pow(A,6)/720));
+    return [x,y];
+  }
+  function leerGML(txt,capa){
+    var doc=new DOMParser().parseFromString(txt,"application/xml");
+    if(doc.getElementsByTagName("parsererror").length) throw {msg:"no es un XML válido"};
+    var todos=doc.getElementsByTagName("*"), srs="";
+    for(var i=0;i<todos.length&&!srs;i++) srs=todos[i].getAttribute("srsName")||"";
+    var cod=(/(\d{4,5})\s*$/.exec(srs)||[])[1]||"25830";
+    if(cod!=="25830"&&cod!=="4258"&&cod!=="4326") throw {msg:"sus coordenadas están en EPSG:"+cod+" y esta herramienta solo coloca ETRS89 UTM huso 30 (EPSG:25830) o geográficas"};
+    function local(n){ return n.localName||n.nodeName.replace(/^.*:/,""); }
+    function coords(el){
+      var t=el.textContent.trim().split(/\s+/).map(Number), dim=parseInt(el.getAttribute("srsDimension")||"2",10)||2, out=[];
+      for(var j=0;j+1<t.length;j+=dim){ var a=t[j],b=t[j+1]; out.push(cod==="25830"?[a,b]:aUTM30(a,b)); }
+      return out;
+    }
+    // Cada objeto (parcela, edificio, parte) con su etiqueta y sus anillos
+    var nuevos=[], obj=0;
+    var miembros=[].filter.call(todos,function(n){ return /^(member|featureMember|featureMembers)$/.test(local(n)); });
+    var objetos=miembros.length?[].concat.apply([],miembros.map(function(m){ return local(m)==="featureMembers"?[].slice.call(m.children):[].slice.call(m.children); })):[doc.documentElement];
+    objetos.forEach(function(o){
+      var et="", hijos=o.getElementsByTagName("*");
+      for(var i=0;i<hijos.length&&!et;i++){ var ln=local(hijos[i]); if(ln==="label"||ln==="localId"||ln==="nationalCadastralReference"||ln==="reference") et=hijos[i].textContent.trim(); }
+      if(!et) et=(o.getAttribute("gml:id")||"").replace(/^.*\./,"");
+      var anillos=[].filter.call(hijos,function(n){ var ln=local(n); return ln==="posList"||ln==="coordinates"; });
+      if(!anillos.length){ var ps=[].filter.call(hijos,function(n){return local(n)==="pos"}); if(ps.length){ var tmp=[]; ps.forEach(function(p){ tmp=tmp.concat(coords(p)); }); anillos=[{lista:tmp}]; } }
+      var ext=null;
+      anillos.forEach(function(r){
+        var p=r.lista||(local(r)==="coordinates"?r.textContent.trim().split(/\s+/).map(function(par){ var v=par.split(",").map(Number); return cod==="25830"?[v[0],v[1]]:aUTM30(v[0],v[1]); }):coords(r));
+        if(p.length<2) return;
+        var cerrado=p.length>3&&Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<0.001;
+        if(cerrado) p=p.slice(0,-1);
+        // Los anillos «interior» son huecos del recinto: al medir restan
+        var hueco=false; if(!r.lista) for(var a=r.parentNode;a&&a!==o;a=a.parentNode){ if(local(a)==="interior"||local(a)==="innerBoundaryIs"){ hueco=true; break; } }
+        var pe={t:"PLINE",l:capa,c:cerrado,p:p}; if(hueco) pe.hueco=true; nuevos.push(pe);
+        if(!ext||(cerrado&&p.length>ext.length&&!ext.c)) ext=p;
+      });
+      if(ext&&et){ var cx=0,cy=0; ext.forEach(function(q){cx+=q[0];cy+=q[1]}); cx/=ext.length; cy/=ext.length;
+        var ancho=Math.max.apply(0,ext.map(function(q){return q[0]}))-Math.min.apply(0,ext.map(function(q){return q[0]}));
+        nuevos.push({t:"TEXT",l:capa,p:[[cx,cy]],s:et,h:Math.max(0.5,Math.min(3,ancho/12)),rot:0,al:1}); }
+      if(anillos.length) obj++;
+    });
+    return {ents:nuevos,objetos:obj,srs:cod};
+  }
+  function cargarGML(files){
+    var msgs=[], err=false;
+    Promise.all([].map.call(files,function(f){
+      return f.text().then(function(txt){
+        var capa="GML "+f.name.replace(/\.(gml|xml)$/i,"").replace(/[^\wÁÉÍÓÚÜÑáéíóúüñ .-]/g,"_").slice(0,40);
+        try{
+          var r=leerGML(txt,capa);
+          if(!r.ents.length){ msgs.push(f.name+": no tiene geometrías"); err=true; return; }
+          ents=ents.filter(function(e){return e.l!==capa}).concat(r.ents);
+          capas[capa]={color:COLORES_GML[nGML++%COLORES_GML.length]}; delete ocultas[capa];
+          msgs.push(f.name+": "+r.objetos+(r.objetos===1?" recinto":" recintos")+(r.srs!=="25830"?" (pasado de geográficas a UTM 30)":""));
+        }catch(e){ msgs.push(f.name+": "+((e&&e.msg)||"no se ha podido leer")); err=true; }
+      });
+    })).then(function(){
+      if(!nombre) nombre="gml.dxf";
+      cambiado(); pintarCapas(); infoSel(); medir(); if(ents.length&&(!vista.s||vista.s===1)) verTodo(); pintar();
+      aviso("GML: "+msgs.join(" · ")+". Cada archivo es una capa (empieza por «GML»): se enciende y se mide como las demás.",err);
+    });
+  }
+  $("f-gml").onchange=function(){ if(this.files.length) cargarGML(this.files); this.value=""; };
+
+  // Ejemplo: una parcela con su vivienda y puntos de campo (datos inventados)
+  $("b-ej").onclick=function(){
+    var x=662140,y=4205380;
+    ents=[{t:"PLINE",l:"EJEMPLO_PARCELA",c:true,p:[[x,y],[x+38,y+22],[x+30,y+52],[x-6,y+34]]},
+      {t:"PLINE",l:"EJEMPLO_CONSTRUCCION",c:true,p:[[x+6,y+14],[x+20,y+22],[x+15,y+33],[x+1,y+25]]},
+      {t:"TEXT",l:"EJEMPLO_TEXTOS",p:[[x+4,y+40]],s:"Ejemplo (datos inventados)",h:1.6,rot:0,al:0}];
+    [[x,y],[x+38,y+22],[x+30,y+52],[x-6,y+34],[x+12,y+6],[x+25,y+40]].forEach(function(q){ ents.push({t:"POINT",l:"EJEMPLO_PUNTOS",p:[[q[0],q[1]]]}); });
+    capas={EJEMPLO_PARCELA:{color:2},EJEMPLO_CONSTRUCCION:{color:30},EJEMPLO_TEXTOS:{color:7},EJEMPLO_PUNTOS:{color:4}};
+    nombre="ejemplo.dxf"; ocultas={}; sel=[]; hist=[]; $("b-undo").disabled=true;
+    cambiado(); pintarCapas(); infoSel(); verTodo(); aviso("Ejemplo cargado. Prueba «Editar puntos» y quita alguno, o mide la capa EJEMPLO_PARCELA.");
+  };
+
+  // ---------- Escritura DXF R12 (texto ASCII; acentos como \U+XXXX, que ZWCAD y AutoCAD entienden) ----------
+  function n(v){ return String(Math.round(v*10000)/10000); }
+  function asc(s){ return String(s).replace(/[^\x20-\x7e]/g,function(c){return "\\U+"+c.charCodeAt(0).toString(16).toUpperCase().padStart(4,"0")}); }
+  function escribirDXF(){
+    var o=[], x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+    function w(c,v){ o.push(String(c)); o.push(String(v)); }
+    ents.forEach(function(e){ e.p.forEach(function(q){ x0=Math.min(x0,q[0]); y0=Math.min(y0,q[1]); x1=Math.max(x1,q[0]); y1=Math.max(y1,q[1]); }); });
+    w(0,"SECTION"); w(2,"HEADER"); w(9,"$ACADVER"); w(1,"AC1009"); w(9,"$EXTMIN"); w(10,n(x0)); w(20,n(y0)); w(9,"$EXTMAX"); w(10,n(x1)); w(20,n(y1)); w(0,"ENDSEC");
+    var usadas={}; ents.forEach(function(e){usadas[e.l]=1});
+    // ZWCAD abre mejor un R12 hecho a mano si trae la vista activa (VPORT) y el tipo de línea CONTINUOUS
+    w(0,"SECTION"); w(2,"TABLES");
+    w(0,"TABLE"); w(2,"VPORT"); w(70,1); w(0,"VPORT"); w(2,"*ACTIVE"); w(70,0); w(10,0); w(20,0); w(11,1); w(21,1);
+    w(12,n((x0+x1)/2)); w(22,n((y0+y1)/2)); w(40,n(Math.max(y1-y0,(x1-x0)/1.6,1)*1.1)); w(41,1.6); w(0,"ENDTAB");
+    w(0,"TABLE"); w(2,"LTYPE"); w(70,1); w(0,"LTYPE"); w(2,"CONTINUOUS"); w(70,0); w(3,"Solid line"); w(72,65); w(73,0); w(40,0); w(0,"ENDTAB");
+    w(0,"TABLE"); w(2,"LAYER"); w(70,Object.keys(usadas).length);
+    Object.keys(usadas).forEach(function(l){ w(0,"LAYER"); w(2,asc(l)); w(70,0); w(62,(capas[l]&&capas[l].color)||7); w(6,"CONTINUOUS"); });
+    w(0,"ENDTAB"); w(0,"ENDSEC");
+    w(0,"SECTION"); w(2,"ENTITIES");
+    ents.forEach(function(e){
+      var L=asc(e.l), q=e.p[0];
+      if(e.t==="POINT"){ w(0,"POINT"); w(8,L); w(10,n(q[0])); w(20,n(q[1])); w(30,0); }
+      else if(e.t==="LINE"){ w(0,"LINE"); w(8,L); w(10,n(q[0])); w(20,n(q[1])); w(30,0); w(11,n(e.p[1][0])); w(21,n(e.p[1][1])); w(31,0); }
+      else if(e.t==="PLINE"){ w(0,"POLYLINE"); w(8,L); w(66,1); w(10,0); w(20,0); w(30,0); w(70,e.c?1:0);
+        e.p.forEach(function(v){ w(0,"VERTEX"); w(8,L); w(10,n(v[0])); w(20,n(v[1])); w(30,0); }); w(0,"SEQEND"); w(8,L); }
+      else if(e.t==="CIRCLE"){ w(0,"CIRCLE"); w(8,L); w(10,n(q[0])); w(20,n(q[1])); w(30,0); w(40,n(e.r)); }
+      else if(e.t==="ARC"){ w(0,"ARC"); w(8,L); w(10,n(q[0])); w(20,n(q[1])); w(30,0); w(40,n(e.r)); w(50,n(e.a0)); w(51,n(e.a1)); }
+      else if(e.t==="TEXT"){ w(0,"TEXT"); w(8,L); w(10,n(q[0])); w(20,n(q[1])); w(30,0); w(40,n(e.h)); w(1,asc(e.s)); if(e.rot) w(50,n(e.rot));
+        if(e.al){ w(72,e.al); w(11,n(q[0])); w(21,n(q[1])); w(31,0); } }
+    });
+    w(0,"ENDSEC"); w(0,"EOF");
+    return o.join("\r\n")+"\r\n";
+  }
+
+  // ZIP sin comprimir con un solo archivo de texto (nombre en UTF-8)
+  function zipUno(nombre,texto){
+    var enc=new TextEncoder(), dat=enc.encode(texto), nom=enc.encode(nombre), crc=-1;
+    for(var i=0;i<dat.length;i++){ crc^=dat[i]; for(var k=0;k<8;k++) crc=(crc>>>1)^(0xEDB88320&-(crc&1)); }
+    crc=(crc^-1)>>>0;
+    var d=new Date(), t=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1), f=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();
+    var loc=new DataView(new ArrayBuffer(30)), cen=new DataView(new ArrayBuffer(46)), fin=new DataView(new ArrayBuffer(22));
+    [[0,0x04034b50,4],[4,20,2],[6,0x0800,2],[8,0,2],[10,t,2],[12,f,2],[14,crc,4],[18,dat.length,4],[22,dat.length,4],[26,nom.length,2],[28,0,2]].forEach(function(c){ c[2]===4?loc.setUint32(c[0],c[1],true):loc.setUint16(c[0],c[1],true); });
+    [[0,0x02014b50,4],[4,20,2],[6,20,2],[8,0x0800,2],[10,0,2],[12,t,2],[14,f,2],[16,crc,4],[20,dat.length,4],[24,dat.length,4],[28,nom.length,2],[30,0,2],[32,0,2],[34,0,2],[36,0,2],[38,0,4],[42,0,4]].forEach(function(c){ c[2]===4?cen.setUint32(c[0],c[1],true):cen.setUint16(c[0],c[1],true); });
+    var tamCen=46+nom.length, offCen=30+nom.length+dat.length;
+    [[0,0x06054b50,4],[4,0,2],[6,0,2],[8,1,2],[10,1,2],[12,tamCen,4],[16,offCen,4],[20,0,2]].forEach(function(c){ c[2]===4?fin.setUint32(c[0],c[1],true):fin.setUint16(c[0],c[1],true); });
+    return new Blob([loc.buffer,nom,dat,cen.buffer,nom,fin.buffer],{type:"application/zip"});
+  }
+
+  // ---------- Guardar: Descargas o carpeta del cliente en Dropbox ----------
+  var dl=null, mcp=null, DBX="Dropbox", RAIZ="/AA 2026", clientes=null;
+  function nombreSalida(){ var b=(nombre||"plano.dxf").replace(/\.dxf$/i,""); var d=new Date(), p=function(x){return String(x).padStart(2,"0")}; return b+" editado "+d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+"-"+p(d.getMinutes())+".dxf"; }
+  function gMsg(t,err){ var m=$("g-msg"); m.hidden=!t; m.textContent=t||""; m.className="msg"+(err?" err":""); }
+  $("b-save").onclick=function(){ $("g-nombre").value=nombreSalida(); $("g-clientes").hidden=true; gMsg(""); $("dlg").showModal(); };
+  $("g-cancel").onclick=function(){ $("dlg").close(); };
+  function nombreFinal(){ var s=$("g-nombre").value.trim().replace(/[\/\\:*?"<>|]+/g," ")||nombreSalida(); return /\.dxf$/i.test(s)?s:s+".dxf"; }
+  $("g-desc").onclick=async function(){
+    if(!dl){ gMsg("Las descargas no están disponibles en esta vista. Abre la página desde Claude.",true); return; }
+    var b=this; b.disabled=true; gMsg("Preparando el archivo…");
+    // Claude no deja descargar .dxf: va dentro de un ZIP con su nombre
+    var zn=nombreFinal();
+    try{ await dl.save({filename:zn,data:escribirDXF()}); gMsg("Descargado: "+zn+"."); }
+    catch(e){ gMsg(e&&e.code==="declined"?"Descarga cancelada.":"No se ha podido descargar ("+((e&&e.code)||"error")+").",true); }
+    b.disabled=false;
+  };
+  function dbxErr(e){ var c=e&&e.code;
+    return c==="sin_sesion"?"Hay que entrar en Dropbox desde la pantalla principal de la app.":c==="red"?"Sin cobertura: inténtalo cuando haya conexión.":c==="server_not_connected"?"Dropbox no está conectado.":
+      c==="needs_reauth"?"Hay que volver a entrar en Dropbox.":
+      c==="not_in_manifest"||c==="approval_required"?"No se dio permiso a la página para usar Dropbox.":
+      "Dropbox no ha respondido"+(e&&e.message?": "+e.message:"")+"."; }
+  async function listar(path){
+    var out=[], r=await mcp.callTool(DBX,"list_folder",{path:path,recursive:false,object_types:["folder"],max_results:600},{cache:false}), p=r&&r.payload||{};
+    out=out.concat(p.entries||[]);
+    while(p.has_more&&p.cursor){ r=await mcp.callTool(DBX,"list_folder",{cursor:p.cursor},{cache:false}); p=r&&r.payload||{}; out=out.concat(p.entries||[]); }
+    return out.filter(function(e){return e.object_type!=="file"});
+  }
+  // Los clientes son las subcarpetas de las carpetas de trabajo «AA …» de AA 2026 (trimestres, Victoria, Blanca…)
+  async function cargarClientes(){
+    var grupos=(await listar(RAIZ)).filter(function(e){return /^AA /i.test(e.name)&&!/CLAUDE/i.test(e.name)});
+    grupos.sort(function(a,b){ var o=function(n){ return /4TO/i.test(n)?0:/3ER/i.test(n)?1:/2DO/i.test(n)?2:/1ER/i.test(n)?3:4; }; return o(a.name)-o(b.name)||a.name.localeCompare(b.name); });
+    var lista=[];
+    for(var i=0;i<grupos.length;i++){
+      try{ (await listar(grupos[i].path_display||RAIZ+"/"+grupos[i].name)).forEach(function(e){ lista.push({n:e.name,g:grupos[i].name,p:e.path_display||(RAIZ+"/"+grupos[i].name+"/"+e.name)}); }); }catch(e){}
+    }
+    return lista;
+  }
+  function pintarClientes(){
+    var L=$("g-lista"), f=$("g-filtro").value.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,""); L.textContent="";
+    var vis=(clientes||[]).filter(function(c){ return !f||(c.n+" "+c.g).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").indexOf(f)>-1; });
+    if(!vis.length){ L.appendChild(el("p","meta",clientes&&clientes.length?"Ningún cliente coincide.":"No hay carpetas de cliente.")); return; }
+    vis.slice(0,200).forEach(function(c){
+      var b=el("button","cli"); b.type="button"; b.appendChild(el("span",null,c.n)); b.appendChild(el("span","g",c.g));
+      b.onclick=function(){ guardarEn(c); }; L.appendChild(b);
+    });
+  }
+  $("g-filtro").oninput=pintarClientes;
+  $("g-cli").onclick=async function(){
+    if(!mcp){ gMsg("Guardar en la carpeta del cliente necesita Dropbox: entra desde la pantalla principal de la app.",true); return; }
+    $("g-clientes").hidden=false;
+    if(clientes){ pintarClientes(); $("g-filtro").focus(); return; }
+    gMsg("Cargando los clientes de Dropbox…");
+    try{ clientes=await cargarClientes(); gMsg(""); pintarClientes(); $("g-filtro").focus(); }
+    catch(e){ gMsg(dbxErr(e),true); }
+  };
+  async function guardarEn(c){
+    var ruta=c.p+"/"+nombreFinal(); gMsg("Guardando en "+c.n+"…");
+    try{ await mcp.callTool(DBX,"create_file",{path:ruta,content:escribirDXF()},{cache:false}); gMsg("Guardado (se sube a Dropbox en cuanto haya cobertura): "+ruta.replace(/^\//,"")); }
+    catch(e){ gMsg(dbxErr(e),true); }
+  }
+
+  function aviso(t,err){ var m=$("msg"); m.hidden=!t; m.textContent=t||""; m.className="msg"+(err?" err":""); }
+
+  // ---------- Abierto desde el parte de campo: carga los puntos y guarda el DXF de Alejandro en 03 CAMPO ----------
+  (function(){
+    var PK=null; try{ PK=JSON.parse(localStorage.getItem("parte-editor")||"null"); }catch(e){}
+    if(!PK||!PK.dxf) return;
+    function volver(){ try{ localStorage.removeItem("parte-editor"); }catch(e){} if(history.length>1) history.back(); else location.href="./"; }
+    var bar=document.querySelector(".bar"), bv=el("button","primary","Guardar y volver al parte"), bb=el("button",null,"Volver sin guardar");
+    bv.type="button"; bb.type="button"; bar.insertBefore(bb,bar.firstChild); bar.insertBefore(bv,bar.firstChild);
+    document.querySelector("header h1").textContent="Editor DXF · "+(PK.cliente||"parte de campo");
+    setTimeout(function(){ abrirDXF(new File([PK.dxf],PK.nombre||"datos_campo.dxf")); },50);
+    bb.onclick=volver;
+    bv.onclick=async function(){
+      if(!ents.length){ aviso("No hay dibujo que guardar.",true); return; }
+      var txt=escribirDXF(), nom=PK.salida||"datos_campo_Alejandro_V1.dxf", ok=false; bv.disabled=true;
+      aviso("Guardando "+nom+" en 03 CAMPO…");
+      if(mcp){ var seg=PK.ruta.split("/").filter(Boolean), acc=""; for(var i=0;i<seg.length;i++){ acc+="/"+seg[i]; if(i<1) continue; try{ await mcp.callTool(DBX,"create_folder",{path:acc.normalize("NFC")},{cache:false}); }catch(e){} } }
+      if(mcp){ try{ await mcp.callTool(DBX,"create_file",{path:(PK.ruta+"/"+nom).normalize("NFC"),content:txt},{cache:false}); ok=true; aviso("Guardado: "+nom+". Se sube a Dropbox en cuanto haya cobertura."); }
+        catch(e){ aviso(dbxErr(e)+" Queda guardado en el parte y se sube al pulsar «Hecho en campo».",true); } }
+      else aviso("Queda guardado en el parte y se sube al pulsar «Hecho en campo».");
+      try{ localStorage.setItem("parte-editor-vuelta",JSON.stringify({job:PK.job,nombre:nom,dxf:txt,enDropbox:ok,t:Date.now()})); }catch(e){}
+      setTimeout(volver,ok?700:2200);
+    };
+  })();
+
+  window.addEventListener("resize",tam);
+  if(window.ResizeObserver) new ResizeObserver(tam).observe(stage);
+  tam();
+  // App independiente: Dropbox por la cola del móvil y descargas directas del navegador
+  if(window.DBX&&DBX.conectado()) mcp=DBX.mcp;
+  dl={save:function(o){ return new Promise(function(ok){ var a=document.createElement("a"), u=URL.createObjectURL(new Blob([o.data],{type:"application/octet-stream"}));
+    a.href=u; a.download=o.filename; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(u); a.remove(); },1500); ok(); }); }};
+})();
+</script>
+
+</body></html>
