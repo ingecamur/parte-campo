@@ -6,7 +6,7 @@
 
 // ====== CONFIGURACIÓN ======
 // App key de la app registrada en https://www.dropbox.com/developers/apps (no es secreta).
-var APP_KEY = "PON_AQUI_LA_APP_KEY";
+var APP_KEY = "6qabc2s31kbr04c";
 // Carpeta de la app en Dropbox: lista de trabajos, fichas de clientes y estado de los partes.
 var CARPETA = "/AA 2026/AA CLAUDE/Parte de campo";
 // ===========================
