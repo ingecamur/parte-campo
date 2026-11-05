@@ -238,7 +238,8 @@ function arrancarDatos(){ cargado=!!trabajos.length||!!clientes.length; pintar()
 function lista(){
   const esMedido=j=>parte(j.id).hecho||j.estado==="medido";
   const cit=j=>parte(j.id).cita||j.cita||"9999";
-  const pend=trabajos.filter(j=>!esMedido(j)).sort((a,b)=>cit(a).localeCompare(cit(b))||(a.orden||99)-(b.orden||99));
+  const pz=j=>(j.presupuestado||j.estadoPres==="enviado")?1:0;
+  const pend=trabajos.filter(j=>!esMedido(j)).sort((a,b)=>pz(a)-pz(b)||cit(a).localeCompare(cit(b))||(a.orden||99)-(b.orden||99));
   const ant=trabajos.filter(esMedido).sort((a,b)=>String(parte(b.id).fecha||"").localeCompare(String(parte(a.id).fecha||"")));
   const q=norm(busqueda), antF=q?ant.filter(j=>norm([j.cliente,j.lugar,j.tipo,j.contacto].join(" ")).includes(q)):ant;
   app.innerHTML=`${estadoHTML()}
@@ -271,6 +272,7 @@ function tarjeta(j){
   return `<button class="job ${medido?'done':''}" data-id="${esc(j.id)}">
     <span class="ico">${medido?I.ok:(I[j.icon]||I.finca)}</span>
     <div>${j.cita?`<span><span class="pill cita ${citaHoy(j.cita)?"hoy":""}">${esc(citaTxt(j.cita))}</span></span>`:(medido?"":'<span><span class="pill sincita">Cita pendiente de confirmar</span></span>')}<div class="t">${esc(j.cliente)}</div><div class="m">${esc(j.tipo)}</div><div class="m">${esc(j.lugar)}</div>
+    ${!medido&&(j.presupuestado||j.estadoPres==="enviado")?'<span><span class="pill" style="background:var(--vis);color:var(--vis-ink)">Presupuestado · sin aceptar</span></span>':''}
     ${medido?`<span><span class="pill ok">Medido${p.fecha?" el "+esc(p.fecha.split("-").reverse().join("/")):""}</span></span>`:''}</div>
     <span class="go">›</span></button>`;
 }
