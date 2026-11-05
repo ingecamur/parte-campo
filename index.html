@@ -238,7 +238,7 @@ function lista(){
   const ant=trabajos.filter(esMedido).sort((a,b)=>String(parte(b.id).fecha||"").localeCompare(String(parte(a.id).fecha||"")));
   const q=norm(busqueda), antF=q?ant.filter(j=>norm([j.cliente,j.lugar,j.tipo,j.contacto].join(" ")).includes(q)):ant;
   app.innerHTML=`${estadoHTML()}
-  ${trabajos.some(j=>j.prueba||j.ejemplo)?'<p class="demo">En pruebas · lo que se sube va a la carpeta de pruebas, no a la del cliente.</p>':''}
+  
   <header class="top"><div class="avatar">${quien?esc(quien[0]):"?"}</div><div style="flex:1;min-width:0"><h1>Parte de campo</h1><div class="sub">${fechaLarga}${quien?" · mide "+esc(quien):""}</div></div>${quien?'<button class="btn small" id="cambiar" style="min-height:44px">Cambiar</button>':''}</header>
   ${quien?'':`<section class="box"><h3>¿Quién mide hoy?</h3><div class="row" style="grid-template-columns:1fr 1fr 1fr">${["Jesús","Pepa","Alejandro"].map(n=>`<button class="btn quien" data-n="${n}">${n}</button>`).join("")}</div></section>`}
   <div class="tabs" role="tablist">${[["medir","Por medir"],["medidos","Medidos"],["clientes","Clientes"]].map(t=>`<button role="tab" data-t="${t[0]}" aria-selected="${pestana===t[0]}">${t[1]}</button>`).join("")}</div>
@@ -349,6 +349,11 @@ function ficha(j0){
 
   <section class="box"><h3>Presupuesto</h3>
     ${presupuestoHTML(j)}
+  </section>
+
+  <section class="box"><h3>Dónde se guarda</h3>
+    <p class="txt" style="margin:0;font-size:15px;overflow-wrap:anywhere">${esc(rutaCampo(j))}</p>
+    ${carpetaDe(j)?'':'<div class="estado bad">Este trabajo no tiene carpeta de encargo: se guarda en «Sin carpeta» y la oficina lo mueve.</div>'}
   </section>
 
   <section class="box"><h3>Qué hacer en la finca</h3>
@@ -509,7 +514,9 @@ function dxfDePuntos(pts){
     w(0,"TEXT");w(8,"TEXTOS_CAMPO");w(10,n(p.x+0.15));w(20,n(p.y+0.15));w(30,0);w(40,"0.3");w(1,asc((p.n+" "+(p.c||"")).trim())); });
   w(0,"ENDSEC");w(0,"EOF"); return o.join("\r\n")+"\r\n";
 }
-function rutaCampo(j){ const p=parte(j.id); return (j.carpeta||"/AA 2026/AA CLAUDE/Pruebas parte de campo/"+j.cliente)+"/03 CAMPO/"+(p.visita||p.fecha||hoyISO()); }
+// Carpeta real del encargo; si el trabajo aún no tiene carpeta, se guarda aparte para no perder nada
+function carpetaDe(j){ return (j.ficha&&j.ficha.carpetaReal)||j.carpetaReal||j.carpeta||""; }
+function rutaCampo(j){ const p=parte(j.id); return (carpetaDe(j)||DBX.CARPETA+"/Sin carpeta/"+String(j.cliente||j.id).replace(/[\\/:*?"<>|]/g,"-"))+"/03 CAMPO/"+(p.visita||p.fecha||hoyISO()); }
 async function nuevoCSV(j,f){
   const p=parte(j.id), txt=await f.text(), pts=leerCSV(txt);
   if(!pts.length){ p.csv={nombre:f.name,error:"No he encontrado puntos con coordenadas UTM en este archivo."}; pintarCSV(j); return; }
