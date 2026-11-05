@@ -439,7 +439,7 @@ function presupuestoHTML(j){
   const cs=(j.conceptos||[]).map(c=>typeof c==="string"?{c}:Array.isArray(c)?{c:c[0],i:c[1]}:c);
   if(!cs.length) return '<div class="estado">Este cliente aún no tiene presupuesto con conceptos en la Gestión comercial.</div>';
   const ok=v=>v!==null&&v!==""&&isFinite(v);
-  const bruto=cs.filter(c=>ok(c.i)).reduce((a,c)=>a+Number(c.i),0), dp=Number(j.dto)||0, dto=bruto*dp/100, base=bruto-dto, iva=j.iva==="21"?base*.21:0;
+  const bruto=cs.filter(c=>ok(c.i)).reduce((a,c)=>a+Number(c.i),0), dp=Number(j.dto)||0, dto=bruto*dp/100, base=bruto-dto, iva=String(j.iva)==="21"?base*.21:0;
   return `${j.estadoPres?`<span><span class="pill">${esc(ESTP[j.estadoPres]||j.estadoPres)}</span></span>`:""}
     <ul class="conceptos">${cs.map(c=>`<li><span>${esc(c.c)}</span>${ok(c.i)?`<span class="imp">${eur(c.i)}</span>`:''}</li>`).join("")}
     ${dp?`<li class="total sub"><span>Descuento ${dp} %</span><span class="imp">−${eur(dto)}</span></li>`:""}

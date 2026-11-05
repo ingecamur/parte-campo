@@ -1,5 +1,5 @@
 /* Parte de campo · funciona sin cobertura: la app se guarda en el móvil; Dropbox nunca se cachea */
-const VERSION = "campo-v5";
+const VERSION = "campo-v6";
 const ARCHIVOS = ["./", "index.html", "editor.html", "dbx.js", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
