@@ -378,7 +378,7 @@ function ficha(j0){
   </section>
 
   <section class="box"><h3>Datos de campo</h3>
-    <label class="btn vis">${I.gps} Subir datos de campo (CSV)<input type="file" id="f-csv" accept=".csv,.txt,text/csv,text/plain"></label>
+    <label class="btn vis">${I.gps} Subir datos de campo (CSV o Excel)<input type="file" id="f-csv" accept=".csv,.txt,.xlsx,.xls,.ods,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"></label>
     <div id="csvinfo"></div>
   </section>
 
@@ -542,11 +542,18 @@ function dxfDePuntos(pts){
 // Carpeta real del encargo; si el trabajo aún no tiene carpeta, se guarda aparte para no perder nada
 function carpetaDe(j){ return (j.ficha&&j.ficha.carpetaReal)||j.carpetaReal||j.carpeta||""; }
 function rutaCampo(j){ const p=parte(j.id); return (carpetaDe(j)||DBX.CARPETA+"/Sin carpeta/"+String(j.cliente||j.id).replace(/[\\/:*?"<>|]/g,"-"))+"/03 CAMPO/"+(p.visita||p.fecha||hoyISO()); }
+// Excel (.xlsx/.xls/.ods): se lee con SheetJS y se trata como un CSV con «;»
+const XLSX_URL="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+function cargarXLSX(){ return window.XLSX?Promise.resolve(window.XLSX):new Promise((ok,ko)=>{ const sc=document.createElement("script"); sc.src=XLSX_URL; sc.onload=()=>window.XLSX?ok(window.XLSX):ko(new Error("sin XLSX")); sc.onerror=()=>ko(new Error("no se pudo cargar")); document.head.appendChild(sc); }); }
+async function excelATexto(f){ const X=await cargarXLSX(); const wb=X.read(await f.arrayBuffer(),{type:"array"}); const hojas=wb.SheetNames.map(n=>X.utils.sheet_to_csv(wb.Sheets[n],{FS:";",rawNumbers:true,blankrows:false})); return hojas.find(t=>leerCSV(t).length)||hojas[0]||""; }
 async function nuevoCSV(j,f){
-  const p=parte(j.id), txt=await f.text(), pts=leerCSV(txt);
-  if(!pts.length){ p.csv={nombre:f.name,error:"No he encontrado puntos con coordenadas UTM en este archivo."}; pintarCSV(j); return; }
+  const p=parte(j.id), esXls=/\.(xlsx|xls|ods)$/i.test(f.name||"");
+  let txt; if(esXls){ try{ txt=await excelATexto(f); }catch(e){ p.csv={nombre:f.name,error:"No he podido leer el Excel"+(navigator.onLine?".":": la primera vez hace falta conexión.")}; pintarCSV(j); return; } } else txt=await f.text();
+  const pts=leerCSV(txt);
+  if(!pts.length){ p.csv={nombre:f.name,error:"No he encontrado puntos con coordenadas UTM en este archivo (CSV o Excel)."}; pintarCSV(j); return; }
   visita(p); p.csv={nombre:f.name,puntos:pts.length}; ls.set("parte-csv-"+j.id,txt); pintarCSV(j);
   p.csv.ruta=rutaCampo(j)+"/datos_campo_original.csv"; await DBX.encolar(p.csv.ruta,txt,"overwrite");
+  if(esXls){ const ext=String(f.name).split(".").pop().toLowerCase(); p.csv.excel="datos_campo_original."+ext; await DBX.encolar(rutaCampo(j)+"/"+p.csv.excel,f,"overwrite"); }
   guardar(j.id); pintarCSV(j); pintarHecho(j);
   abrirEditor(j,dxfDePuntos(pts),"datos_campo.dxf");
 }
