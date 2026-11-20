@@ -295,6 +295,7 @@ function fichaCliente(c){
   app.innerHTML=`${estadoHTML()}
   <button class="back" id="back">${I.atras} Clientes</button>
   <div class="hero"><span class="k">${esc(c.trabajo||"")}</span><h2>${esc(c.nombre)}</h2><span class="k">${esc(c.lugar||c.municipio||"")}</span></div>
+  ${trabajos.some(t=>t.id===c.id)?`<a class="btn ok" href="#${esc(c.id)}">${I.ok} Hacer el parte de campo (fotos, audios, CSV, LandStar)</a>`:'<div class="estado">Este cliente no está en «Por medir»: para hacer su parte de campo, que lo pasen a Aceptado en la Gestión comercial.</div>'}
   ${ll||q?`<div class="row"><a class="btn vis" href="https://www.google.com/maps/search/?api=1&query=${ll||q}" target="_blank" rel="noopener">${I.mapa} Maps</a>
     <a class="btn vis" href="${ll?"https://waze.com/ul?ll="+ll+"&navigate=yes":"https://waze.com/ul?q="+q+"&navigate=yes"}" target="_blank" rel="noopener">${I.coche} Waze</a></div>`:""}
   <section class="box"><h3>Contacto</h3>
