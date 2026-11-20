@@ -382,6 +382,12 @@ function ficha(j0){
     <div id="csvinfo"></div>
   </section>
 
+  <section class="box"><h3>Copia de LandStar</h3>
+    <label class="btn">${I.gps} Subir copia LandStar<input type="file" id="f-copia" multiple></label>
+    <div class="estado">Elige la copia de seguridad del proyecto (el ZIP de CHCNAV/Projects/Default) y, si quieres, los CSV de «1ACarpeta de exportación de CHC». Se guardan en 03 CAMPO/copia_landstar, sin mandarlos por correo.</div>
+    <div class="lista" id="copias"></div>
+  </section>
+
   <section class="box"><h3>Problemas</h3>
     <div class="inc">${incs.map(x=>`<button class="btn warn" aria-pressed="${p.inc.includes(x)}" data-x="${x}">${x}</button>`).join("")}</div>
   </section>
@@ -407,7 +413,20 @@ function ficha(j0){
   document.getElementById("f-fotos").onchange=e=>{ const f=e.target.files[0]; e.target.value=""; if(f) nuevaFoto(j,f); };
   document.getElementById("f-voz").onchange=e=>{ const f=e.target.files[0]; e.target.value=""; if(f) nuevaVoz(j,f); };
   document.getElementById("f-csv").onchange=e=>{ const f=e.target.files[0]; e.target.value=""; if(f) nuevoCSV(j,f); };
-  pintarFotos(j); pintarVoces(j); pintarCSV(j); pintarHecho(j);
+  document.getElementById("f-copia").onchange=async e=>{ const fs=[...e.target.files]; e.target.value=""; for(const f of fs) await nuevaCopia(j,f); };
+  pintarFotos(j); pintarVoces(j); pintarCSV(j); pintarCopias(j); pintarHecho(j);
+}
+// ---------- Copia de seguridad de LandStar: ZIP/CSV tal cual a 03 CAMPO/copia_landstar ----------
+async function nuevaCopia(j,f){
+  const p=parte(j.id); visita(p); p.copias=p.copias||[];
+  const limpio=String(f.name||"copia").replace(/[\\/:*?"<>|]/g,"-");
+  let nombre=limpio, k=1; while(p.copias.some(c=>c.nombre===nombre)){ k++; nombre=limpio.replace(/(\.[^.]+)?$/,"_"+k+"$1"); }
+  const item={nombre,kb:Math.round((f.size||0)/1024)}; p.copias.push(item);
+  Object.assign(item,await alMovil(j,f,"copia_landstar",nombre)); guardar(j.id); pintarCopias(j); pintarHecho(j);
+}
+function pintarCopias(j){
+  const box=document.getElementById("copias"); if(!box) return; const p=parte(j.id), cs=p.copias||[];
+  box.innerHTML=cs.map(c=>`<div><b>${esc(c.nombre)}</b> · ${c.kb.toLocaleString("es-ES")} KB · ${est(c)}</div>`).join("");
 }
 
 const ESTP={nuevo:"Sin presupuesto",enviado:"Presupuesto enviado",aceptado:"Aceptado",curso:"En curso",entregado:"Entregado",cobrado:"Cobrado",rechazado:"Rechazado"};
@@ -574,7 +593,8 @@ function resumen(j,p,ruta){
   L.push("QUÉ SE HA HECHO"); (j.tareas||[]).forEach((t,i)=>L.push(" ["+(p.checks[i]?"X":" ")+"] "+t[1])); L.push("");
   L.push("PROBLEMAS: "+(p.inc.length?p.inc.join(", "):"ninguno")); L.push("");
   L.push("DATOS DE CAMPO: "+(p.csv&&p.csv.puntos?p.csv.nombre+" ("+p.csv.puntos+" puntos) → datos_campo_original.csv":"no se subió CSV"));
-  L.push("PLANO EDITADO: "+(p.dxf?p.dxf.nombre:"no se editó")); L.push("");
+  L.push("PLANO EDITADO: "+(p.dxf?p.dxf.nombre:"no se editó"));
+  const cs=p.copias||[]; L.push("COPIA LANDSTAR ("+cs.length+")"); cs.forEach(c=>L.push(" - copia_landstar/"+c.nombre)); L.push("");
   L.push("FOTOS ("+p.fotos.length+")"); p.fotos.forEach(f=>L.push(" - fotos/"+f.nombre+(f.voz?" + fotos/"+f.voz.nombre:"")));
   L.push("NOTAS DE VOZ ("+p.voces.length+")"); p.voces.forEach(v=>L.push(" - notas_voz/"+v.nombre));
   L.push("","NOTA ESCRITA",p.nota||"(sin nota)");
@@ -591,6 +611,7 @@ async function terminar(j){
   await crear("resumen_parte.txt",resumen(j,p,ruta),"Resumen del parte");
   const media=p.fotos.length+p.fotos.filter(f=>f.voz).length+p.voces.length;
   if(media) pon(media+" fotos y notas de voz → fotos/ y notas_voz/",true);
+  if((p.copias||[]).length) pon(p.copias.length+" archivo(s) de LandStar → copia_landstar/",true);
   p.hecho=true; p.visita=null; guardar(j.id); pintarHecho(j); DBX.procesar(); window.scrollTo(0,document.body.scrollHeight);
 }
 // ---------- Navegación ----------
